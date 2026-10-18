@@ -16,8 +16,10 @@ export function AgentSprite({
   const fill = `oklch(0.72 0.17 ${agent.color})`
   const shade = `oklch(0.45 0.14 ${agent.color})`
   const status = agent.status
-  const asking = status === 'needs-input'
+  const asking = status === 'needs-question'
+  const begging = status === 'needs-permission'
   const listening = status === 'listening'
+  const sleeping = status === 'idle'
 
   return (
     <button
@@ -36,6 +38,11 @@ export function AgentSprite({
             ?
           </div>
         )}
+        {begging && (
+          <div className="pixel-box animate-question-float bg-warning px-2 py-1 font-display text-[8px] text-primary-foreground">
+            OK?
+          </div>
+        )}
         {listening && (
           <div className="pixel-box animate-pop bg-primary px-2 py-1 font-display text-[8px] text-primary-foreground">
             <span className="animate-listen-dots">···</span>
@@ -44,6 +51,11 @@ export function AgentSprite({
         {status === 'done' && (
           <div className="pixel-box animate-pop bg-success px-2 py-1 font-display text-xs text-primary-foreground">
             ✓
+          </div>
+        )}
+        {sleeping && (
+          <div className="animate-zzz px-1 font-display text-[8px] text-muted-foreground">
+            z
           </div>
         )}
         {status === 'working' && (
@@ -67,9 +79,13 @@ export function AgentSprite({
               ? 'animate-jump'
               : asking
                 ? 'animate-wonder'
-                : listening
-                  ? 'animate-listen'
-                  : ''
+                : begging
+                  ? 'animate-beg'
+                  : listening
+                    ? 'animate-listen'
+                    : sleeping
+                      ? 'animate-sleep'
+                      : ''
         }
       >
         <svg
@@ -84,7 +100,7 @@ export function AgentSprite({
             y="0"
             width="2"
             height="2"
-            fill={asking || listening ? 'var(--color-primary)' : 'var(--color-primary)'}
+            fill="var(--color-primary)"
           />
           <rect x="7.5" y="2" width="1" height="2" fill="var(--color-border)" />
           <rect
@@ -116,13 +132,19 @@ export function AgentSprite({
             </>
           ) : asking ? (
             <>
-              {/* eyes glancing up at the ? */}
               <rect x="5" y="6" width="2" height="2" fill="var(--color-border)" />
               <rect x="9" y="6" width="2" height="2" fill="var(--color-border)" />
               <rect x="5" y="6" width="1" height="1" fill={fill} />
               <rect x="9" y="6" width="1" height="1" fill={fill} />
-              {/* soft thoughtful mouth */}
               <rect x="7" y="10" width="2" height="1" fill="var(--color-border)" />
+            </>
+          ) : begging ? (
+            <>
+              <rect x="5" y="7" width="2" height="2" fill="var(--color-border)" />
+              <rect x="9" y="7" width="2" height="2" fill="var(--color-border)" />
+              <rect x="5" y="8" width="1" height="1" fill={fill} />
+              <rect x="9" y="8" width="1" height="1" fill={fill} />
+              <rect x="6" y="10" width="4" height="1" fill="var(--color-border)" />
             </>
           ) : listening ? (
             <>
@@ -137,6 +159,12 @@ export function AgentSprite({
                 <rect x="0" y="10" width="1" height="1" fill={shade} />
               </g>
             </>
+          ) : sleeping ? (
+            <>
+              <rect x="5" y="8" width="2" height="1" fill="var(--color-border)" />
+              <rect x="9" y="8" width="2" height="1" fill="var(--color-border)" />
+              <rect x="7" y="10" width="2" height="1" fill="var(--color-border)" />
+            </>
           ) : (
             <>
               <rect x="5" y="7" width="2" height="2" fill="var(--color-border)" />
@@ -146,31 +174,52 @@ export function AgentSprite({
           )}
 
           <g
-            className={status === 'working' ? 'animate-typing' : asking ? 'animate-chin-think' : ''}
+            className={
+              status === 'working'
+                ? 'animate-typing'
+                : asking
+                  ? 'animate-chin-think'
+                  : begging
+                    ? 'animate-beg-hands'
+                    : ''
+            }
             style={{ transformOrigin: '13px 8px', transformBox: 'view-box' }}
           >
             {asking ? (
-              // hand to chin — thinking
               <>
                 <rect x="12" y="9" width="2" height="3" fill={shade} />
                 <rect x="11" y="9" width="2" height="2" fill={shade} />
               </>
+            ) : begging ? (
+              <rect x="12" y="11" width="3" height="2" fill={shade} />
             ) : listening ? (
               <rect x="13" y="7" width="2" height="4" fill={shade} />
+            ) : sleeping ? (
+              <rect x="13" y="9" width="2" height="2" fill={shade} />
             ) : (
               <rect x="13" y="8" width="2" height="3" fill={shade} />
             )}
           </g>
           <g
-            className={status === 'working' ? 'animate-typing' : ''}
+            className={
+              status === 'working'
+                ? 'animate-typing'
+                : begging
+                  ? 'animate-beg-hands'
+                  : ''
+            }
             style={{
               transformOrigin: '3px 8px',
               transformBox: 'view-box',
               animationDelay: '0.09s',
             }}
           >
-            {listening ? (
+            {begging ? (
+              <rect x="1" y="11" width="3" height="2" fill={shade} />
+            ) : listening ? (
               <rect x="1" y="6" width="2" height="3" fill={shade} />
+            ) : sleeping ? (
+              <rect x="1" y="9" width="2" height="2" fill={shade} />
             ) : (
               <rect x="1" y="8" width="2" height="3" fill={shade} />
             )}
@@ -189,11 +238,13 @@ export function AgentSprite({
 
       <div
         className={`pixel-box mt-1 px-2 py-0.5 font-display text-[8px] group-hover:bg-primary group-hover:text-primary-foreground ${
-          asking
+          asking || begging
             ? 'bg-warning text-primary-foreground'
             : listening
               ? 'bg-primary text-primary-foreground'
-              : 'bg-card text-card-foreground'
+              : sleeping
+                ? 'bg-muted text-muted-foreground'
+                : 'bg-card text-card-foreground'
         }`}
       >
         {agent.name}

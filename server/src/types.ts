@@ -2,8 +2,11 @@ export type AgentStatus =
   | 'idle'
   | 'working'
   | 'listening'
-  | 'needs-input'
+  | 'needs-question'
+  | 'needs-permission'
   | 'done'
+
+export type AgentSource = 'pty' | 'task'
 
 export interface AgentRecord {
   id: string
@@ -11,6 +14,8 @@ export interface AgentRecord {
   name: string
   color: number
   parentId?: string
+  source?: AgentSource
+  taskKey?: string
   status: AgentStatus
   x: number
   createdAt: string

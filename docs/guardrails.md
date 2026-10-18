@@ -8,6 +8,8 @@ These rules exist because past bugs or product decisions were explicit. Future a
 - **Do not** use `agent -p` / `stream-json` for the main interactive session unless the product scope changes entirely.
 - **Do not** destroy the xterm WebSocket or PTY when the user **hides** the terminal. Only **DISMISS**, workspace delete, or process exit should kill sessions.
 - **Do not** unmount `AgentTerminal` on hide — use `visible` + keep `openTerminalIds` so replay and live PTY stay connected.
+- **Do not** spawn a PTY or attach xterm for `source === 'task'` inferred children. Click opens the parent terminal.
+- **Do not** scan the full replay or run heavy Task regex on every PTY chunk. Cheap hint first; debounce; last ~8k only.
 
 ## HTTP / API client
 
@@ -25,14 +27,16 @@ These rules exist because past bugs or product decisions were explicit. Future a
 
 ## Status semantics
 
-- **Do not** mark permission waits as `done` / green check. Use `needs-input` + wondering sprite when `permission-detect.ts` matches.
-- **Do not** mark idle-at-prompt as `working`. Use `listening` after the idle timeout when no permission pattern.
+- **Do not** mark permission waits as `done` / green check. Use `needs-permission` + beg pose when `classifyPrompt` returns permission.
+- **Do not** mark a clarifying question as permission or `done`. Use `needs-question` + wondering `?`.
+- **Do not** mark idle-at-prompt as `working`. After work with no prompt, use `done`, then `idle` (sleep) after a longer silence.
+- **Do not** treat typing as `working`. Keystrokes are `listening`.
 - **Do not** reset status to fake `idle` on sprite click in the client; server/PTY owns status (removed behavior — keep it that way).
 
 ## UI / UX
 
 - **Do not** show the island platform under the focused agent (it overlapped the header).
-- **Do not** use `!` / panic raised-hands for permission; use wondering pose + `?` bubble.
+- **Do not** use `!` / panic raised-hands for permission; use the polite-beg pose (`OK?`). Questions keep wondering + `?`.
 - **Do not** cap focused terminal width with a small `max-w-6xl`; focused mode uses full width intentionally.
 
 ## Persistence

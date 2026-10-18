@@ -62,8 +62,10 @@ export async function loadState() {
           ...agent,
           status:
             agent.status === 'working'
-            || agent.status === 'needs-input'
             || agent.status === 'listening'
+            || agent.status === 'needs-question'
+            || agent.status === 'needs-permission'
+            || (agent.status as string) === 'needs-input'
               ? 'idle'
               : agent.status,
         })),
@@ -122,7 +124,13 @@ export async function deleteWorkspace(workspaceId: string) {
 
 export async function addAgent(
   workspaceId: string,
-  input: { name?: string; parentId?: string; color?: number },
+  input: {
+    name?: string
+    parentId?: string
+    color?: number
+    source?: AgentRecord['source']
+    taskKey?: string
+  },
 ) {
   const workspace = await getWorkspace(workspaceId)
   if (!workspace) return null
@@ -139,6 +147,8 @@ export async function addAgent(
         + (input.parentId ? ' jr' : ''),
     color: input.color ?? Math.floor(Math.random() * 360),
     parentId: input.parentId,
+    source: input.source ?? 'pty',
+    taskKey: input.taskKey,
     status: 'working',
     x: 10 + Math.random() * 75,
     createdAt: new Date().toISOString(),

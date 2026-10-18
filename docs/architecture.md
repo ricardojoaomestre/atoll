@@ -30,7 +30,7 @@ flowchart LR
 | GET | `/api/workspaces/:id` | Single workspace + live status overlay |
 | GET | `/api/workspaces/:id/agents` | Agent list |
 | POST | `/api/workspaces/:id/agents` | Spawn PTY; optional `{ name }` |
-| POST | `/api/workspaces/:id/agents/:agentId/sub` | Child agent (`parentId`) |
+| POST | `/api/workspaces/:id/agents/:agentId/sub` | Real child PTY (`parentId`, `source: 'pty'`) |
 | DELETE | `/api/workspaces/:id/agents/:agentId` | Kill PTY + remove agent (+ children) |
 
 Spawn command (see `pty-manager.ts`):
@@ -51,10 +51,11 @@ Binary resolution: `CURSOR_AGENT_BIN`, then `~/.local/bin/agent`, then `command 
   - `{ "type": "input", "data": "<string>" }`
 - Plain string messages are also written to the PTY (legacy path).
 - On connect: attach to existing session or spawn if missing; send `replay` buffer.
+- **Refuse** attach/spawn when `agent.source === 'task'` (inferred Task child has no PTY).
 
 ### `/api/events`
 
-- Server → client JSON: `{ "type": "status", "agentId", "status" }` or `{ "type": "exit", "agentId", "exitCode" }`.
+- Server → client JSON: `{ "type": "status", "agentId", "status" }`, `{ "type": "exit", "agentId", "exitCode" }`, or `{ "type": "spawn", "agent" }` (inferred Task children).
 - **Events-first refresh**: map and workspace pages subscribe here for badge updates. They fetch REST on mount, after spawn/dismiss/create/delete, and once after a socket reconnect. There is no interval poll.
 - Client helper: `client/src/lib/events.ts` (`subscribeAgentEvents`).
 
@@ -63,9 +64,12 @@ Binary resolution: `CURSOR_AGENT_BIN`, then `~/.local/bin/agent`, then `command 
 - One `Session` per agent id: `node-pty-prebuilt-multiarch` spawn, replay chunk ring (compacted to ~200k chars), socket fan-out.
 - Permission scans use only the last ~8k of replay (see `permission-detect.ts`).
 - Status-only `state.json` writes are debounced (~1s); create/delete/spawn persist immediately.
-- **Idle timers**:
-  - After output stops: if `permission-detect` matches recent replay → `needs-input` after ~1.5s; else `listening` after ~8s.
-  - New output or user input → `working`.
+- **Idle timers** (`classifyPrompt` on the last ~8k only, not every chunk):
+  - User keystrokes → `listening` (do not flip to `working`).
+  - Agent output → `working`.
+  - Quiet after `working`: permission → `needs-permission` at ~1.5s; question → `needs-question` at ~1.5s; else `done` at ~6s.
+  - Quiet after `done` or `listening` → `idle` at ~20s.
+- **Task children**: debounce (~400ms) when a chunk matches a cheap hint; `detectTaskChildren` on the last ~8k only (`task-detect.ts`). Cap ~8 per parent. Emit `spawn` + `status`. Never spawn a PTY for `source === 'task'`.
 - **Do not** tear down PTY when UI hides terminal; only on dismiss, workspace delete, or process exit.
 
 ## Dev networking

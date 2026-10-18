@@ -30,6 +30,16 @@ export function useWorkspaces() {
         void refresh()
       },
       onEvent: (msg) => {
+        if (msg.type === 'spawn' && msg.agent) {
+          const spawned = msg.agent
+          setWorkspaces((prev) =>
+            prev.map((ws) => {
+              if (ws.id !== spawned.workspaceId) return ws
+              if (ws.agents.some((agent) => agent.id === spawned.id)) return ws
+              return { ...ws, agents: [...ws.agents, spawned] }
+            }),
+          )
+        }
         if (msg.type === 'status' && msg.status) {
           const status = msg.status
           setWorkspaces((prev) =>

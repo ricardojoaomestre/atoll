@@ -205,6 +205,26 @@
   100% { opacity: 0.25; }
 }
 
+@keyframes sleep {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(1px); }
+}
+
+@keyframes zzz {
+  0%, 100% { transform: translateY(0); opacity: 0.45; }
+  50% { transform: translateY(-3px); opacity: 0.9; }
+}
+
+@keyframes beg {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(1px) rotate(-2deg); }
+}
+
+@keyframes beg-hands {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1px); }
+}
+
 @keyframes slide-in-from-right {
   from { transform: translateX(24px); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
@@ -224,6 +244,10 @@
 .animate-listen { animation: listen 1.4s ease-in-out infinite; }
 .animate-ear { animation: ear 1.2s ease-in-out infinite; transform-origin: 1px 8px; }
 .animate-listen-dots { animation: listen-dots 1.4s ease-in-out infinite; }
+.animate-sleep { animation: sleep 2.4s ease-in-out infinite; }
+.animate-zzz { animation: zzz 1.8s ease-in-out infinite; }
+.animate-beg { animation: beg 1.6s ease-in-out infinite; }
+.animate-beg-hands { animation: beg-hands 0.9s ease-in-out infinite; }
 .animate-in { animation: slide-in-from-right 0.2s ease-out; }
 
 .is-focused .stars,
@@ -245,7 +269,11 @@
   .animate-question-float,
   .animate-listen,
   .animate-ear,
-  .animate-listen-dots {
+  .animate-listen-dots,
+  .animate-sleep,
+  .animate-zzz,
+  .animate-beg,
+  .animate-beg-hands {
     animation: none;
   }
 }

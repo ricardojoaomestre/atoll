@@ -32,8 +32,9 @@ Workspaces persist to `~/.cursor-isles/state.json`.
 3. Click an agent — open the real terminal side panel
 4. **+ SUB-AGENT** / **DISMISS** — spawn a child session or kill the PTY
 
-Status chips (`working` / `needs-input` / `done`) come from PTY activity
-heuristics; approvals and prompts stay in the raw terminal.
+Status chips (`working` / `listening` / `needs-question` / `needs-permission` /
+`done` / `idle`) come from PTY activity heuristics; approvals and prompts stay
+in the raw terminal.
 
 ## Notes
 

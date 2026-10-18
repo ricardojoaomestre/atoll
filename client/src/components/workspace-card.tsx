@@ -1,14 +1,14 @@
 import { Link } from 'react-router-dom'
 import { Island } from './island'
 import type { Workspace } from '../types'
-import { countByStatus } from '../lib/status'
+import { countNeedsAttention } from '../lib/status'
 
 interface WorkspaceCardProps {
   workspace: Workspace
 }
 
 export function WorkspaceCard({ workspace }: WorkspaceCardProps) {
-  const needs = countByStatus(workspace.agents, 'needs-input')
+  const needs = countNeedsAttention(workspace.agents)
   const topAgents = workspace.agents.filter((a) => !a.parentId).slice(0, 5)
 
   return (

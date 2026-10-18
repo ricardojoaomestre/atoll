@@ -21,10 +21,12 @@ export function WorkspacePage() {
   const [openTerminalIds, setOpenTerminalIds] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
 
-  const openTerminal = useCallback((agentId: string) => {
-    setSelectedId(agentId)
+  const openAgent = useCallback((agent: Agent) => {
+    const terminalId =
+      agent.source === 'task' && agent.parentId ? agent.parentId : agent.id
+    setSelectedId(agent.id)
     setOpenTerminalIds((prev) =>
-      prev.includes(agentId) ? prev : [...prev, agentId],
+      prev.includes(terminalId) ? prev : [...prev, terminalId],
     )
   }, [])
 
@@ -54,6 +56,14 @@ export function WorkspacePage() {
         void refresh()
       },
       onEvent: (msg) => {
+        if (msg.type === 'spawn' && msg.agent) {
+          const spawned = msg.agent
+          setWorkspace((prev) => {
+            if (!prev || prev.id !== spawned.workspaceId) return prev
+            if (prev.agents.some((a) => a.id === spawned.id)) return prev
+            return { ...prev, agents: [...prev.agents, spawned] }
+          })
+        }
         if (msg.type === 'status' && msg.status) {
           const status = msg.status
           setWorkspace((prev) =>
@@ -89,13 +99,13 @@ export function WorkspacePage() {
     try {
       const agent = await spawnAgent(workspace.id)
       await refresh()
-      openTerminal(agent.id)
+      openAgent(agent)
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Spawn failed')
     } finally {
       setBusy(false)
     }
-  }, [workspace, refresh, openTerminal])
+  }, [workspace, refresh, openAgent])
 
   const onSub = useCallback(
     async (parent: Agent) => {
@@ -104,14 +114,14 @@ export function WorkspacePage() {
       try {
         const agent = await spawnSubAgent(workspace.id, parent.id)
         await refresh()
-        openTerminal(agent.id)
+        openAgent(agent)
       } catch (err) {
         alert(err instanceof Error ? err.message : 'Sub-agent failed')
       } finally {
         setBusy(false)
       }
     },
-    [workspace, refresh, openTerminal],
+    [workspace, refresh, openAgent],
   )
 
   const onDismiss = useCallback(
@@ -121,7 +131,11 @@ export function WorkspacePage() {
       try {
         await dismissAgent(workspace.id, agent.id)
         setOpenTerminalIds((prev) => prev.filter((openId) => openId !== agent.id))
-        setSelectedId((current) => (current === agent.id ? null : current))
+        setSelectedId((current) => {
+          if (current === agent.id) return null
+          const selected = workspace.agents.find((a) => a.id === current)
+          return selected?.parentId === agent.id ? null : current
+        })
         await refresh()
       } catch (err) {
         alert(err instanceof Error ? err.message : 'Dismiss failed')
@@ -184,7 +198,10 @@ export function WorkspacePage() {
             ··· {countByStatus(workspace.agents, 'listening')}
           </span>
           <span className="pixel-box bg-warning px-2 py-1 text-primary-foreground">
-            ? {countByStatus(workspace.agents, 'needs-input')}
+            ? {countByStatus(workspace.agents, 'needs-question')}
+          </span>
+          <span className="pixel-box bg-warning px-2 py-1 text-primary-foreground">
+            OK? {countByStatus(workspace.agents, 'needs-permission')}
           </span>
           <span className="pixel-box bg-success px-2 py-1 text-primary-foreground">
             ✓ {countByStatus(workspace.agents, 'done')}
@@ -224,7 +241,7 @@ export function WorkspacePage() {
                   <AgentSprite
                     agent={agent}
                     selected={selectedId === agent.id}
-                    onClick={() => openTerminal(agent.id)}
+                    onClick={() => openAgent(agent)}
                   />
                   {workspace.agents
                     .filter((a) => a.parentId === agent.id)
@@ -234,7 +251,7 @@ export function WorkspacePage() {
                         small
                         agent={child}
                         selected={selectedId === child.id}
-                        onClick={() => openTerminal(child.id)}
+                        onClick={() => openAgent(child)}
                       />
                     ))}
                 </div>
@@ -265,17 +282,28 @@ export function WorkspacePage() {
 
           <div className="relative min-h-[55vh] w-full min-w-0 flex-1 sm:min-h-0">
             {workspace.agents
-              .filter((agent) => openTerminalIds.includes(agent.id))
-              .map((agent) => (
-                <AgentTerminal
-                  key={agent.id}
-                  agent={agent}
-                  visible={selectedId === agent.id}
-                  onClose={hideTerminal}
-                  onSubAgent={onSub}
-                  onDismiss={onDismiss}
-                />
-              ))}
+              .filter(
+                (agent) =>
+                  agent.source !== 'task' && openTerminalIds.includes(agent.id),
+              )
+              .map((agent) => {
+                const viewingTaskChild = workspace.agents.some(
+                  (child) =>
+                    child.id === selectedId
+                    && child.source === 'task'
+                    && child.parentId === agent.id,
+                )
+                return (
+                  <AgentTerminal
+                    key={agent.id}
+                    agent={agent}
+                    visible={selectedId === agent.id || viewingTaskChild}
+                    onClose={hideTerminal}
+                    onSubAgent={onSub}
+                    onDismiss={onDismiss}
+                  />
+                )
+              })}
           </div>
         </section>
       </div>

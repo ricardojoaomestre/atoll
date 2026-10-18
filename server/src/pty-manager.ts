@@ -3,12 +3,17 @@ import * as pty from 'node-pty-prebuilt-multiarch'
 import type { IPty } from 'node-pty-prebuilt-multiarch'
 import type { WebSocket } from 'ws'
 import { resolveAgentBin } from './agent-bin.js'
-import { looksLikePermissionPrompt } from './permission-detect.js'
-import { updateAgent } from './store.js'
-import type { AgentStatus } from './types.js'
+import { classifyPrompt } from './permission-detect.js'
+import { detectTaskChildren, looksLikeTaskChunk } from './task-detect.js'
+import { addAgent, getWorkspace, updateAgent } from './store.js'
+import type { AgentRecord, AgentStatus } from './types.js'
 
-const IDLE_DONE_MS = 8_000
-const IDLE_PERMISSION_MS = 1_500
+const WAIT_PROMPT_MS = 1_500
+const TASK_DONE_MS = 6_000
+const SLEEP_MS = 20_000
+const TYPING_HOLD_MS = 800
+const TASK_SCAN_MS = 400
+const TASK_CHILD_CAP = 8
 const REPLAY_MAX = 200_000
 const REPLAY_COMPACT_AT = 240_000
 
@@ -19,8 +24,10 @@ interface Session {
   pty: IPty
   sockets: Set<WebSocket>
   status: AgentStatus
-  lastOutputAt: number
+  lastActivityAt: number
+  lastInputAt: number
   idleTimer?: ReturnType<typeof setTimeout>
+  taskTimer?: ReturnType<typeof setTimeout>
   replayChunks: string[]
   replayBytes: number
 }
@@ -107,7 +114,8 @@ class PtyManager extends EventEmitter {
       pty: term,
       sockets: new Set(),
       status: 'working',
-      lastOutputAt: Date.now(),
+      lastActivityAt: Date.now(),
+      lastInputAt: 0,
       replayChunks: [],
       replayBytes: 0,
     }
@@ -117,15 +125,19 @@ class PtyManager extends EventEmitter {
     this.emit('status', input.agentId, 'working')
 
     term.onData((data) => {
-      session.lastOutputAt = Date.now()
+      session.lastActivityAt = Date.now()
       appendReplay(session, data)
       for (const socket of session.sockets) {
         if (socket.readyState === socket.OPEN) {
           socket.send(data)
         }
       }
-      this.setStatus(session, 'working')
+      const typing =
+        session.status === 'listening'
+        && Date.now() - session.lastInputAt < TYPING_HOLD_MS
+      if (!typing) this.setStatus(session, 'working')
       this.armIdleTimer(session)
+      if (looksLikeTaskChunk(data)) this.scheduleTaskScan(session)
     })
 
     term.onExit(({ exitCode }) => {
@@ -140,6 +152,7 @@ class PtyManager extends EventEmitter {
         }
       }
       this.sessions.delete(input.agentId)
+      void this.finishTaskChildren(input.workspaceId, input.agentId)
       this.emit('exit', input.agentId, exitCode)
     })
 
@@ -172,30 +185,14 @@ class PtyManager extends EventEmitter {
         }
         if (parsed.type === 'input' && typeof parsed.data === 'string') {
           session.pty.write(parsed.data)
-          session.lastOutputAt = Date.now()
-          if (
-            session.status === 'needs-input'
-            || session.status === 'done'
-            || session.status === 'listening'
-          ) {
-            this.setStatus(session, 'working')
-          }
-          this.armIdleTimer(session)
+          this.markListening(session)
           return
         }
       } catch {
         // plain text input
       }
       session.pty.write(text)
-      session.lastOutputAt = Date.now()
-      if (
-        session.status === 'needs-input'
-        || session.status === 'done'
-        || session.status === 'listening'
-      ) {
-        this.setStatus(session, 'working')
-      }
-      this.armIdleTimer(session)
+      this.markListening(session)
     })
 
     socket.on('close', () => {
@@ -209,6 +206,10 @@ class PtyManager extends EventEmitter {
     const session = this.sessions.get(agentId)
     if (!session) return false
     this.clearIdleTimer(session)
+    if (session.taskTimer) {
+      clearTimeout(session.taskTimer)
+      session.taskTimer = undefined
+    }
     try {
       session.pty.kill()
     } catch {
@@ -233,20 +234,134 @@ class PtyManager extends EventEmitter {
     }
   }
 
+  private scheduleTaskScan(session: Session) {
+    if (session.taskTimer) return
+    session.taskTimer = setTimeout(() => {
+      session.taskTimer = undefined
+      void this.syncTaskChildren(session)
+    }, TASK_SCAN_MS)
+  }
+
+  private async syncTaskChildren(session: Session) {
+    const workspace = await getWorkspace(session.workspaceId)
+    if (!workspace) return
+
+    const detected = detectTaskChildren(recentReplay(session))
+    const existing = workspace.agents.filter(
+      (agent) => agent.parentId === session.agentId && agent.source === 'task',
+    )
+
+    for (const item of detected) {
+      let child = existing.find((agent) => agent.taskKey === item.key)
+      if (!child) {
+        const fresh = await getWorkspace(session.workspaceId)
+        child = fresh?.agents.find(
+          (agent) =>
+            agent.parentId === session.agentId && agent.taskKey === item.key,
+        )
+        if (child) existing.push(child)
+      }
+      if (!child) {
+        if (existing.length >= TASK_CHILD_CAP) continue
+        const parentColor =
+          workspace.agents.find((a) => a.id === session.agentId)?.color ?? 0
+        const created = await addAgent(session.workspaceId, {
+          name: item.name,
+          parentId: session.agentId,
+          color: (parentColor + 28) % 360,
+          source: 'task',
+          taskKey: item.key,
+        })
+        if (!created) continue
+        child = created
+        existing.push(created)
+        this.emit('spawn', created)
+      }
+      const status: AgentStatus = item.done ? 'done' : 'working'
+      if (child.status !== status) {
+        await updateAgent(session.workspaceId, child.id, { status })
+        this.emit('status', child.id, status)
+        child.status = status
+      }
+    }
+
+    if (session.status === 'done' || session.status === 'idle') {
+      await this.finishTaskChildren(session.workspaceId, session.agentId, existing)
+    }
+  }
+
+  private async finishTaskChildren(
+    workspaceId: string,
+    parentId: string,
+    known?: AgentRecord[],
+  ) {
+    const workspace = known ? null : await getWorkspace(workspaceId)
+    const children =
+      known
+      ?? workspace?.agents.filter(
+        (agent) => agent.parentId === parentId && agent.source === 'task',
+      )
+      ?? []
+    for (const child of children) {
+      if (child.status === 'working') {
+        await updateAgent(workspaceId, child.id, { status: 'done' })
+        this.emit('status', child.id, 'done')
+      }
+    }
+  }
+
+  private markListening(session: Session) {
+    const now = Date.now()
+    session.lastActivityAt = now
+    session.lastInputAt = now
+    this.setStatus(session, 'listening')
+    this.armIdleTimer(session)
+  }
+
   private armIdleTimer(session: Session) {
     this.clearIdleTimer(session)
-    const permission = looksLikePermissionPrompt(recentReplay(session))
-    const delay = permission ? IDLE_PERMISSION_MS : IDLE_DONE_MS
+    const delay = this.idleDelay(session)
+    if (delay === null) return
+
+    const started = session.lastActivityAt
     session.idleTimer = setTimeout(() => {
       if (!this.sessions.has(session.agentId)) return
-      if (Date.now() - session.lastOutputAt < delay) return
-      this.setStatus(
-        session,
-        looksLikePermissionPrompt(recentReplay(session))
-          ? 'needs-input'
-          : 'listening',
-      )
+      if (session.lastActivityAt !== started) return
+      this.onIdle(session)
     }, delay)
+  }
+
+  private idleDelay(session: Session) {
+    if (session.status === 'working') {
+      const kind = classifyPrompt(recentReplay(session))
+      return kind ? WAIT_PROMPT_MS : TASK_DONE_MS
+    }
+    if (session.status === 'done' || session.status === 'listening') {
+      return SLEEP_MS
+    }
+    return null
+  }
+
+  private onIdle(session: Session) {
+    if (session.status === 'working') {
+      const kind = classifyPrompt(recentReplay(session))
+      if (kind === 'permission') {
+        this.setStatus(session, 'needs-permission')
+        return
+      }
+      if (kind === 'question') {
+        this.setStatus(session, 'needs-question')
+        return
+      }
+      this.setStatus(session, 'done')
+      this.armIdleTimer(session)
+      void this.finishTaskChildren(session.workspaceId, session.agentId)
+      return
+    }
+    if (session.status === 'done' || session.status === 'listening') {
+      this.setStatus(session, 'idle')
+      void this.finishTaskChildren(session.workspaceId, session.agentId)
+    }
   }
 
   private clearIdleTimer(session: Session) {

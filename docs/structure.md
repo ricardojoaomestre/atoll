@@ -12,7 +12,7 @@ cursor-isles/
 │   └── src/
 │       ├── App.tsx       # Routes: /, /workspace/:id
 │       ├── index.css     # Pixel theme, animations, xterm layout
-│       ├── types.ts      # AgentStatus, Workspace, Agent
+│       ├── types.ts      # AgentStatus, AgentSource, Workspace, Agent
 │       ├── lib/
 │       │   ├── api.ts    # REST + wsUrl()
 │       │   ├── events.ts # /api/events subscribe + reconnect
@@ -35,6 +35,7 @@ cursor-isles/
         ├── store.ts      # ~/.cursor-isles/state.json
         ├── pty-manager.ts
         ├── permission-detect.ts
+        ├── task-detect.ts
         ├── agent-bin.ts  # Resolve agent binary
         ├── types.ts
         └── node-pty-prebuilt-multiarch.d.ts
@@ -51,10 +52,10 @@ cursor-isles/
 ## Persistence
 
 - Path: `~/.cursor-isles/state.json`
-- Workspaces + agent **metadata** only (name, color, parentId, last known status).
-- **PTY processes are in-memory**; server restart clears live sessions; store resets `working` / `listening` / `needs-input` to `idle` on load.
+- Workspaces + agent **metadata** only (name, color, parentId, source, taskKey, last known status).
+- **PTY processes are in-memory**; server restart clears live sessions; store resets `working` / `listening` / `needs-question` / `needs-permission` (and legacy `needs-input`) to `idle` on load.
 
 ## Important client state (workspace page)
 
-- `selectedId`: which agent’s terminal panel is visible (focused mode).
-- `openTerminalIds`: agents with an mounted `AgentTerminal` (xterm + WS). Hiding only clears `selectedId`; dismiss removes from `openTerminalIds`.
+- `selectedId`: which sprite is highlighted (focused mode). For `source: 'task'` this is the child; the mounted terminal is still the parent.
+- `openTerminalIds`: agents with a mounted `AgentTerminal` (xterm + WS). Never includes task children. Hiding only clears `selectedId`; dismiss removes from `openTerminalIds`.

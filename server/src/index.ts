@@ -125,10 +125,14 @@ async function main() {
     if (!workspace) return reply.code(404).send({ error: 'not found' })
     const parent = workspace.agents.find((a) => a.id === req.params.agentId)
     if (!parent) return reply.code(404).send({ error: 'parent not found' })
+    if (parent.source === 'task') {
+      return reply.code(400).send({ error: 'task child has no pty' })
+    }
 
     const agent = await addAgent(workspace.id, {
       name: req.body?.name,
       parentId: parent.id,
+      source: 'pty',
     })
     if (!agent) return reply.code(500).send({ error: 'failed to create agent' })
 
@@ -178,11 +182,18 @@ async function main() {
         socket.send(JSON.stringify({ type: 'exit', agentId, exitCode }))
       }
     }
+    const onSpawn = (agent: unknown) => {
+      if (socket.readyState === socket.OPEN) {
+        socket.send(JSON.stringify({ type: 'spawn', agent }))
+      }
+    }
     ptyManager.on('status', onStatus)
     ptyManager.on('exit', onExit)
+    ptyManager.on('spawn', onSpawn)
     socket.on('close', () => {
       ptyManager.off('status', onStatus)
       ptyManager.off('exit', onExit)
+      ptyManager.off('spawn', onSpawn)
     })
   })
 
@@ -192,6 +203,11 @@ async function main() {
     const found = await getAgent(req.params.agentId)
     if (!found) {
       socket.close(4404, 'agent not found')
+      return
+    }
+
+    if (found.agent.source === 'task') {
+      socket.close(4403, 'task child has no pty')
       return
     }
 

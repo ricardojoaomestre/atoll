@@ -1,10 +1,11 @@
 import { wsUrl } from './api'
-import type { AgentStatus } from '../types'
+import type { Agent, AgentStatus } from '../types'
 
 export type AgentEvent = {
   type: string
-  agentId: string
+  agentId?: string
   status?: AgentStatus
+  agent?: Agent
 }
 
 const RETRY_MS = 1_500
