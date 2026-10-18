@@ -10,6 +10,6 @@ export function stripAnsi(text: string) {
 }
 
 export function looksLikePermissionPrompt(text: string) {
-  const recent = stripAnsi(text).slice(-6_000)
+  const recent = stripAnsi(text.slice(-8_000)).slice(-6_000)
   return PERMISSION_RE.test(recent)
 }

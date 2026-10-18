@@ -2,6 +2,8 @@
 
 Arcade-style map for managing local Cursor `agent` CLI sessions.
 
+**For AI / coding agents:** start with [AGENTS.md](AGENTS.md) and [docs/](docs/).
+
 Pixel islands for workspaces, robot sprites for agents, and a real xterm
 panel wired to interactive `agent` processes over a PTY.
 

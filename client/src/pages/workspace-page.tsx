@@ -5,13 +5,13 @@ import {
   getWorkspace,
   spawnAgent,
   spawnSubAgent,
-  wsUrl,
 } from '../lib/api'
+import { subscribeAgentEvents } from '../lib/events'
 import { AgentSprite } from '../components/agent-sprite'
 import { AgentTerminal } from '../components/agent-terminal'
 import { Island } from '../components/island'
 import { countByStatus } from '../lib/status'
-import type { Agent, AgentStatus, Workspace } from '../types'
+import type { Agent, Workspace } from '../types'
 
 export function WorkspacePage() {
   const { id } = useParams<{ id: string }>()
@@ -21,16 +21,16 @@ export function WorkspacePage() {
   const [openTerminalIds, setOpenTerminalIds] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
 
-  function openTerminal(agentId: string) {
+  const openTerminal = useCallback((agentId: string) => {
     setSelectedId(agentId)
     setOpenTerminalIds((prev) =>
       prev.includes(agentId) ? prev : [...prev, agentId],
     )
-  }
+  }, [])
 
-  function hideTerminal() {
+  const hideTerminal = useCallback(() => {
     setSelectedId(null)
-  }
+  }, [])
 
   const refresh = useCallback(async () => {
     if (!id) return
@@ -46,26 +46,22 @@ export function WorkspacePage() {
 
   useEffect(() => {
     void refresh()
-    const timer = window.setInterval(() => void refresh(), 4000)
-    return () => window.clearInterval(timer)
   }, [refresh])
 
   useEffect(() => {
-    const socket = new WebSocket(wsUrl('/api/events'))
-    socket.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(String(event.data)) as {
-          type: string
-          agentId: string
-          status?: AgentStatus
-        }
+    return subscribeAgentEvents({
+      onReconnect: () => {
+        void refresh()
+      },
+      onEvent: (msg) => {
         if (msg.type === 'status' && msg.status) {
+          const status = msg.status
           setWorkspace((prev) =>
             prev
               ? {
                   ...prev,
                   agents: prev.agents.map((a) =>
-                    a.id === msg.agentId ? { ...a, status: msg.status! } : a,
+                    a.id === msg.agentId ? { ...a, status } : a,
                   ),
                 }
               : prev,
@@ -83,12 +79,58 @@ export function WorkspacePage() {
               : prev,
           )
         }
-      } catch {
-        // ignore
-      }
+      },
+    })
+  }, [refresh])
+
+  const onSpawn = useCallback(async () => {
+    if (!workspace) return
+    setBusy(true)
+    try {
+      const agent = await spawnAgent(workspace.id)
+      await refresh()
+      openTerminal(agent.id)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Spawn failed')
+    } finally {
+      setBusy(false)
     }
-    return () => socket.close()
-  }, [])
+  }, [workspace, refresh, openTerminal])
+
+  const onSub = useCallback(
+    async (parent: Agent) => {
+      if (!workspace) return
+      setBusy(true)
+      try {
+        const agent = await spawnSubAgent(workspace.id, parent.id)
+        await refresh()
+        openTerminal(agent.id)
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Sub-agent failed')
+      } finally {
+        setBusy(false)
+      }
+    },
+    [workspace, refresh, openTerminal],
+  )
+
+  const onDismiss = useCallback(
+    async (agent: Agent) => {
+      if (!workspace) return
+      setBusy(true)
+      try {
+        await dismissAgent(workspace.id, agent.id)
+        setOpenTerminalIds((prev) => prev.filter((openId) => openId !== agent.id))
+        setSelectedId((current) => (current === agent.id ? null : current))
+        await refresh()
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Dismiss failed')
+      } finally {
+        setBusy(false)
+      }
+    },
+    [workspace, refresh],
+  )
 
   if (error && !workspace) {
     return (
@@ -114,50 +156,10 @@ export function WorkspacePage() {
   const focusedAgent =
     workspace.agents.find((a) => a.id === selectedId) ?? null
 
-  async function onSpawn() {
-    setBusy(true)
-    try {
-      const agent = await spawnAgent(workspace!.id)
-      await refresh()
-      openTerminal(agent.id)
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Spawn failed')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function onSub(parent: Agent) {
-    setBusy(true)
-    try {
-      const agent = await spawnSubAgent(workspace!.id, parent.id)
-      await refresh()
-      openTerminal(agent.id)
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Sub-agent failed')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function onDismiss(agent: Agent) {
-    setBusy(true)
-    try {
-      await dismissAgent(workspace!.id, agent.id)
-      setOpenTerminalIds((prev) => prev.filter((id) => id !== agent.id))
-      if (selectedId === agent.id) setSelectedId(null)
-      await refresh()
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Dismiss failed')
-    } finally {
-      setBusy(false)
-    }
-  }
-
   return (
     <main
       className={`relative flex min-h-screen flex-col overflow-hidden py-4 ${
-        focused ? 'px-3 sm:px-4' : 'px-6 py-8'
+        focused ? 'is-focused px-3 sm:px-4' : 'px-6 py-8'
       }`}
     >
       <div className="stars pointer-events-none absolute inset-0" />
@@ -203,7 +205,6 @@ export function WorkspacePage() {
           focused ? 'max-w-none' : 'max-w-6xl'
         }`}
       >
-        {/* Island overview — zooms out of view when focused */}
         <section
           className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-500 ease-out ${
             focused
@@ -243,7 +244,6 @@ export function WorkspacePage() {
           </div>
         </section>
 
-        {/* Focused agent + terminal — ~28% / ~72% full width */}
         <section
           className={`absolute inset-0 flex flex-col gap-3 transition-all duration-500 ease-out sm:flex-row sm:gap-4 ${
             focused
@@ -272,8 +272,8 @@ export function WorkspacePage() {
                   agent={agent}
                   visible={selectedId === agent.id}
                   onClose={hideTerminal}
-                  onSubAgent={() => void onSub(agent)}
-                  onDismiss={() => void onDismiss(agent)}
+                  onSubAgent={onSub}
+                  onDismiss={onDismiss}
                 />
               ))}
           </div>

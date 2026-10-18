@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { listWorkspaces, wsUrl } from '../lib/api'
-import type { AgentStatus, Workspace } from '../types'
+import { listWorkspaces } from '../lib/api'
+import { subscribeAgentEvents } from '../lib/events'
+import type { Workspace } from '../types'
 
 export function useWorkspaces() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
@@ -21,27 +22,21 @@ export function useWorkspaces() {
 
   useEffect(() => {
     void refresh()
-    const id = window.setInterval(() => void refresh(), 4000)
-    return () => window.clearInterval(id)
   }, [refresh])
 
   useEffect(() => {
-    const socket = new WebSocket(wsUrl('/api/events'))
-    socket.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(String(event.data)) as {
-          type: string
-          agentId: string
-          status?: AgentStatus
-        }
+    return subscribeAgentEvents({
+      onReconnect: () => {
+        void refresh()
+      },
+      onEvent: (msg) => {
         if (msg.type === 'status' && msg.status) {
+          const status = msg.status
           setWorkspaces((prev) =>
             prev.map((ws) => ({
               ...ws,
               agents: ws.agents.map((agent) =>
-                agent.id === msg.agentId
-                  ? { ...agent, status: msg.status! }
-                  : agent,
+                agent.id === msg.agentId ? { ...agent, status } : agent,
               ),
             })),
           )
@@ -51,19 +46,14 @@ export function useWorkspaces() {
             prev.map((ws) => ({
               ...ws,
               agents: ws.agents.map((agent) =>
-                agent.id === msg.agentId
-                  ? { ...agent, status: 'done' }
-                  : agent,
+                agent.id === msg.agentId ? { ...agent, status: 'done' } : agent,
               ),
             })),
           )
         }
-      } catch {
-        // ignore
-      }
-    }
-    return () => socket.close()
-  }, [])
+      },
+    })
+  }, [refresh])
 
   return { workspaces, setWorkspaces, loading, error, refresh }
 }

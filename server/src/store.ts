@@ -27,9 +27,28 @@ function notify() {
   for (const listener of listeners) listener()
 }
 
+const STATUS_PERSIST_MS = 1_000
+let persistTimer: ReturnType<typeof setTimeout> | undefined
+
 async function persist() {
   await mkdir(dirname(STATE_PATH), { recursive: true })
   await writeFile(STATE_PATH, JSON.stringify(state, null, 2), 'utf8')
+}
+
+function persistSoon() {
+  if (persistTimer) return
+  persistTimer = setTimeout(() => {
+    persistTimer = undefined
+    void persist()
+  }, STATUS_PERSIST_MS)
+}
+
+async function persistNow() {
+  if (persistTimer) {
+    clearTimeout(persistTimer)
+    persistTimer = undefined
+  }
+  await persist()
 }
 
 export async function loadState() {
@@ -85,7 +104,7 @@ export async function createWorkspace(name: string, path: string) {
     createdAt: new Date().toISOString(),
   }
   state = { workspaces: [...state.workspaces, workspace] }
-  await persist()
+  await persistNow()
   notify()
   return workspace
 }
@@ -96,7 +115,7 @@ export async function deleteWorkspace(workspaceId: string) {
   state = {
     workspaces: state.workspaces.filter((ws) => ws.id !== workspaceId),
   }
-  await persist()
+  await persistNow()
   notify()
   return existing
 }
@@ -132,7 +151,7 @@ export async function addAgent(
         : ws,
     ),
   }
-  await persist()
+  await persistNow()
   notify()
   return agent
 }
@@ -157,7 +176,9 @@ export async function updateAgent(
     }),
   }
   if (updated) {
-    await persist()
+    const statusOnly = Object.keys(patch).length === 1 && patch.status !== undefined
+    if (statusOnly) persistSoon()
+    else await persistNow()
     notify()
   }
   return updated
@@ -180,7 +201,7 @@ export async function removeAgent(workspaceId: string, agentId: string) {
       }
     }),
   }
-  await persist()
+  await persistNow()
   notify()
   return target
 }

@@ -1,0 +1,47 @@
+# Cursor Isles — guide for coding agents
+
+Read this before changing the repo. Human-oriented setup stays in [README.md](README.md).
+
+## What this project is
+
+**Cursor Isles** is a local-only web UI that maps Cursor CLI (`agent`) sessions onto a pixel-art “island” metaphor:
+
+- **Workspaces** = folders on disk (`agent --workspace <path>`)
+- **Agents** = interactive PTY sessions running the real `agent` TUI
+- **Terminal panel** = xterm.js showing raw CLI output (not a reimplemented chat UI)
+
+Inspired by [Agent Isles](https://agent-arcade-workspaces.lovable.app); behavior is real CLI, not mock data.
+
+## Doc map
+
+| Document | Use when |
+| --- | --- |
+| [docs/overview.md](docs/overview.md) | Product behavior, user flows, status semantics |
+| [docs/structure.md](docs/structure.md) | Where files live, naming, key modules |
+| [docs/architecture.md](docs/architecture.md) | API, WebSockets, PTY lifecycle, persistence |
+| [docs/development.md](docs/development.md) | Install, dev servers, build, env vars |
+| [docs/guardrails.md](docs/guardrails.md) | **Do not** break these — common pitfalls |
+
+## Quick run
+
+```bash
+npm run install:all
+npm run dev
+```
+
+- UI: http://127.0.0.1:5173  
+- API: http://127.0.0.1:8787 (localhost only)  
+- Requires `agent login` on the host machine.
+
+## Stack (short)
+
+- **Root**: npm workspaces-style scripts (`concurrently` runs client + server)
+- **client/**: Vite, React 19, React Router, Tailwind 4, xterm.js
+- **server/**: Fastify, `@fastify/websocket`, `node-pty-prebuilt-multiarch`
+
+## Default agent workflow
+
+1. Skim [docs/guardrails.md](docs/guardrails.md).
+2. Make the smallest change that matches existing patterns in `client/src` and `server/src`.
+3. Run `npx tsc --noEmit` in `client/` and `server/` after TypeScript edits.
+4. Do not commit unless the user asks.

@@ -42,6 +42,11 @@
     image-rendering: pixelated;
   }
 
+  .xterm,
+  .xterm * {
+    image-rendering: auto;
+  }
+
   button,
   input {
     font: inherit;
@@ -221,9 +226,39 @@
 .animate-listen-dots { animation: listen-dots 1.4s ease-in-out infinite; }
 .animate-in { animation: slide-in-from-right 0.2s ease-out; }
 
+.is-focused .stars,
+.is-focused .animate-float {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stars,
+  .animate-float,
+  .animate-bob,
+  .animate-jump,
+  .animate-blink,
+  .animate-puff,
+  .animate-typing,
+  .animate-wave,
+  .animate-wonder,
+  .animate-chin-think,
+  .animate-question-float,
+  .animate-listen,
+  .animate-ear,
+  .animate-listen-dots {
+    animation: none;
+  }
+}
+
 .xterm {
   height: 100%;
   padding: 4px;
+  content-visibility: auto;
+}
+
+[data-agent-terminal][hidden] {
+  display: none;
+  content-visibility: hidden;
 }
 
 .xterm-viewport {

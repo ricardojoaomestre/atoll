@@ -22,7 +22,7 @@ const PORT = Number(process.env.PORT ?? 8787)
 async function main() {
   await loadState()
 
-  const app = Fastify({ logger: true })
+  const app = Fastify({ logger: { level: 'warn' } })
   await app.register(cors, { origin: true })
   await app.register(websocket)
 

@@ -9,6 +9,8 @@ import type { AgentStatus } from './types.js'
 
 const IDLE_DONE_MS = 8_000
 const IDLE_PERMISSION_MS = 1_500
+const REPLAY_MAX = 200_000
+const REPLAY_COMPACT_AT = 240_000
 
 interface Session {
   agentId: string
@@ -19,7 +21,39 @@ interface Session {
   status: AgentStatus
   lastOutputAt: number
   idleTimer?: ReturnType<typeof setTimeout>
-  replay: string
+  replayChunks: string[]
+  replayBytes: number
+}
+
+function appendReplay(session: Session, data: string) {
+  session.replayChunks.push(data)
+  session.replayBytes += data.length
+  if (session.replayBytes > REPLAY_COMPACT_AT) {
+    compactReplay(session)
+  }
+}
+
+function compactReplay(session: Session) {
+  const joined = session.replayChunks.join('')
+  const kept = joined.length > REPLAY_MAX ? joined.slice(-REPLAY_MAX) : joined
+  session.replayChunks = kept ? [kept] : []
+  session.replayBytes = kept.length
+}
+
+function replayText(session: Session) {
+  if (session.replayChunks.length > 1) compactReplay(session)
+  return session.replayChunks[0] ?? ''
+}
+
+function recentReplay(session: Session, max = 8_000) {
+  if (session.replayBytes <= max) {
+    return session.replayChunks.join('')
+  }
+  let out = ''
+  for (let i = session.replayChunks.length - 1; i >= 0 && out.length < max; i--) {
+    out = session.replayChunks[i] + out
+  }
+  return out.slice(-max)
 }
 
 class PtyManager extends EventEmitter {
@@ -74,7 +108,8 @@ class PtyManager extends EventEmitter {
       sockets: new Set(),
       status: 'working',
       lastOutputAt: Date.now(),
-      replay: '',
+      replayChunks: [],
+      replayBytes: 0,
     }
 
     this.sessions.set(input.agentId, session)
@@ -83,7 +118,7 @@ class PtyManager extends EventEmitter {
 
     term.onData((data) => {
       session.lastOutputAt = Date.now()
-      session.replay = (session.replay + data).slice(-200_000)
+      appendReplay(session, data)
       for (const socket of session.sockets) {
         if (socket.readyState === socket.OPEN) {
           socket.send(data)
@@ -98,7 +133,7 @@ class PtyManager extends EventEmitter {
       const status: AgentStatus = exitCode === 0 ? 'done' : 'done'
       this.setStatus(session, status)
       const goodbye = `\r\n\x1b[90m[agent exited with code ${exitCode}]\x1b[0m\r\n`
-      session.replay += goodbye
+      appendReplay(session, goodbye)
       for (const socket of session.sockets) {
         if (socket.readyState === socket.OPEN) {
           socket.send(goodbye)
@@ -117,8 +152,9 @@ class PtyManager extends EventEmitter {
     if (!session) return false
 
     session.sockets.add(socket)
-    if (session.replay) {
-      socket.send(session.replay)
+    const replay = replayText(session)
+    if (replay) {
+      socket.send(replay)
     }
 
     socket.on('message', (raw) => {
@@ -199,14 +235,16 @@ class PtyManager extends EventEmitter {
 
   private armIdleTimer(session: Session) {
     this.clearIdleTimer(session)
-    const permission = looksLikePermissionPrompt(session.replay)
+    const permission = looksLikePermissionPrompt(recentReplay(session))
     const delay = permission ? IDLE_PERMISSION_MS : IDLE_DONE_MS
     session.idleTimer = setTimeout(() => {
       if (!this.sessions.has(session.agentId)) return
       if (Date.now() - session.lastOutputAt < delay) return
       this.setStatus(
         session,
-        looksLikePermissionPrompt(session.replay) ? 'needs-input' : 'listening',
+        looksLikePermissionPrompt(recentReplay(session))
+          ? 'needs-input'
+          : 'listening',
       )
     }, delay)
   }
