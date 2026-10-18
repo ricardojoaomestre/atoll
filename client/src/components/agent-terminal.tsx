@@ -21,6 +21,7 @@ export function AgentTerminal({
   onSubAgent,
   onDismiss,
 }: AgentTerminalProps) {
+  const panelRef = useRef<HTMLElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
@@ -132,10 +133,23 @@ export function AgentTerminal({
     return () => window.cancelAnimationFrame(id)
   }, [visible])
 
+  useEffect(() => {
+    if (!visible) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [visible, onClose])
+
   return (
     <aside
-      className={`pixel-box fixed inset-x-3 inset-y-3 z-30 flex w-auto flex-col bg-card sm:inset-y-4 sm:right-4 sm:left-auto sm:w-[min(520px,calc(100vw-2rem))] ${
-        visible ? 'animate-in' : 'pointer-events-none invisible'
+      ref={panelRef}
+      data-agent-terminal
+      className={`pixel-box absolute inset-0 flex flex-col bg-card transition-all duration-300 ${
+        visible
+          ? 'z-10 opacity-100'
+          : 'pointer-events-none z-0 opacity-0'
       }`}
       aria-hidden={!visible}
     >

@@ -110,6 +110,9 @@ export function WorkspacePage() {
   }
 
   const roots = workspace.agents.filter((a) => !a.parentId)
+  const focused = selectedId !== null
+  const focusedAgent =
+    workspace.agents.find((a) => a.id === selectedId) ?? null
 
   async function onSpawn() {
     setBusy(true)
@@ -152,10 +155,18 @@ export function WorkspacePage() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden px-6 py-8">
+    <main
+      className={`relative flex min-h-screen flex-col overflow-hidden py-4 ${
+        focused ? 'px-3 sm:px-4' : 'px-6 py-8'
+      }`}
+    >
       <div className="stars pointer-events-none absolute inset-0" />
 
-      <header className="relative mx-auto flex max-w-5xl flex-wrap items-center gap-4">
+      <header
+        className={`relative z-20 mx-auto flex w-full flex-wrap items-center gap-4 ${
+          focused ? 'max-w-none' : 'max-w-6xl'
+        }`}
+      >
         <Link to="/" className="pixel-btn bg-muted px-3 py-2">
           ◀ MAP
         </Link>
@@ -179,60 +190,95 @@ export function WorkspacePage() {
         </div>
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || focused}
           onClick={() => void onSpawn()}
-          className="pixel-btn bg-primary px-4 py-3 text-primary-foreground"
+          className="pixel-btn bg-primary px-4 py-3 text-primary-foreground disabled:opacity-40"
         >
           + SPAWN AGENT
         </button>
       </header>
 
-      <section
-        className="relative mx-auto mt-24 max-w-5xl animate-float"
-        style={{ animationDuration: '6s' }}
+      <div
+        className={`relative mx-auto mt-4 min-h-0 w-full flex-1 ${
+          focused ? 'max-w-none' : 'max-w-6xl'
+        }`}
       >
-        <div className="relative flex min-h-56 flex-wrap items-end justify-center gap-10 px-6 pb-0">
-          {roots.length === 0 && (
-            <p className="pb-6 font-mono text-2xl text-muted-foreground">
-              An empty island... spawn your first agent!
-            </p>
-          )}
-          {roots.map((agent) => (
-            <div key={agent.id} className="flex items-end gap-1">
-              <AgentSprite
-                agent={agent}
-                selected={selectedId === agent.id}
-                onClick={() => openTerminal(agent.id)}
-              />
-              {workspace.agents
-                .filter((a) => a.parentId === agent.id)
-                .map((child) => (
+        {/* Island overview — zooms out of view when focused */}
+        <section
+          className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-500 ease-out ${
+            focused
+              ? 'pointer-events-none scale-150 opacity-0'
+              : 'scale-100 opacity-100'
+          }`}
+        >
+          <div className="animate-float w-full" style={{ animationDuration: '6s' }}>
+            <div className="relative flex min-h-56 flex-wrap items-end justify-center gap-10 px-6 pb-0">
+              {roots.length === 0 && (
+                <p className="pb-6 font-mono text-2xl text-muted-foreground">
+                  An empty island... spawn your first agent!
+                </p>
+              )}
+              {roots.map((agent) => (
+                <div key={agent.id} className="flex items-end gap-1">
                   <AgentSprite
-                    key={child.id}
-                    small
-                    agent={child}
-                    selected={selectedId === child.id}
-                    onClick={() => openTerminal(child.id)}
+                    agent={agent}
+                    selected={selectedId === agent.id}
+                    onClick={() => openTerminal(agent.id)}
                   />
-                ))}
+                  {workspace.agents
+                    .filter((a) => a.parentId === agent.id)
+                    .map((child) => (
+                      <AgentSprite
+                        key={child.id}
+                        small
+                        agent={child}
+                        selected={selectedId === child.id}
+                        onClick={() => openTerminal(child.id)}
+                      />
+                    ))}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <Island hue={workspace.hue} wide />
-      </section>
+            <Island hue={workspace.hue} wide />
+          </div>
+        </section>
 
-      {workspace.agents
-        .filter((agent) => openTerminalIds.includes(agent.id))
-        .map((agent) => (
-          <AgentTerminal
-            key={agent.id}
-            agent={agent}
-            visible={selectedId === agent.id}
-            onClose={hideTerminal}
-            onSubAgent={() => void onSub(agent)}
-            onDismiss={() => void onDismiss(agent)}
-          />
-        ))}
+        {/* Focused agent + terminal — ~28% / ~72% full width */}
+        <section
+          className={`absolute inset-0 flex flex-col gap-3 transition-all duration-500 ease-out sm:flex-row sm:gap-4 ${
+            focused
+              ? 'pointer-events-auto scale-100 opacity-100'
+              : 'pointer-events-none scale-90 opacity-0'
+          }`}
+        >
+          <div className="relative flex w-full shrink-0 flex-col items-center justify-center sm:w-[28%] lg:w-[24%]">
+            {focusedAgent && (
+              <div className="origin-center scale-[2.2] sm:scale-[2.6]">
+                <AgentSprite
+                  agent={focusedAgent}
+                  selected
+                  onClick={hideTerminal}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="relative min-h-[55vh] w-full min-w-0 flex-1 sm:min-h-0">
+            {workspace.agents
+              .filter((agent) => openTerminalIds.includes(agent.id))
+              .map((agent) => (
+                <AgentTerminal
+                  key={agent.id}
+                  agent={agent}
+                  visible={selectedId === agent.id}
+                  onClose={hideTerminal}
+                  onSubAgent={() => void onSub(agent)}
+                  onDismiss={() => void onDismiss(agent)}
+                />
+              ))}
+          </div>
+        </section>
+      </div>
     </main>
   )
 }

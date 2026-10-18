@@ -22,6 +22,7 @@ export function AgentSprite({
   return (
     <button
       type="button"
+      data-agent-sprite
       onClick={onClick}
       className="group relative flex flex-col items-center focus:outline-none"
       style={{
@@ -31,8 +32,8 @@ export function AgentSprite({
     >
       <div className="absolute -top-12 flex h-10 items-end justify-center">
         {asking && (
-          <div className="pixel-box animate-pop bg-warning px-2 py-1 font-display text-xs text-primary-foreground">
-            <span className="animate-blink">?</span>
+          <div className="pixel-box animate-question-float bg-warning px-2 py-1 font-display text-xs text-primary-foreground">
+            ?
           </div>
         )}
         {listening && (
@@ -65,7 +66,7 @@ export function AgentSprite({
             : status === 'done'
               ? 'animate-jump'
               : asking
-                ? 'animate-plead'
+                ? 'animate-wonder'
                 : listening
                   ? 'animate-listen'
                   : ''
@@ -83,13 +84,7 @@ export function AgentSprite({
             y="0"
             width="2"
             height="2"
-            fill={
-              asking
-                ? 'var(--color-warning)'
-                : listening
-                  ? 'var(--color-primary)'
-                  : 'var(--color-primary)'
-            }
+            fill={asking || listening ? 'var(--color-primary)' : 'var(--color-primary)'}
           />
           <rect x="7.5" y="2" width="1" height="2" fill="var(--color-border)" />
           <rect
@@ -121,22 +116,21 @@ export function AgentSprite({
             </>
           ) : asking ? (
             <>
-              <rect x="4" y="6" width="3" height="3" fill="var(--color-border)" />
-              <rect x="9" y="6" width="3" height="3" fill="var(--color-border)" />
-              <rect x="5" y="7" width="1" height="1" fill={fill} />
-              <rect x="10" y="7" width="1" height="1" fill={fill} />
-              <rect x="6" y="10" width="4" height="2" fill="var(--color-border)" />
+              {/* eyes glancing up at the ? */}
+              <rect x="5" y="6" width="2" height="2" fill="var(--color-border)" />
+              <rect x="9" y="6" width="2" height="2" fill="var(--color-border)" />
+              <rect x="5" y="6" width="1" height="1" fill={fill} />
+              <rect x="9" y="6" width="1" height="1" fill={fill} />
+              {/* soft thoughtful mouth */}
+              <rect x="7" y="10" width="2" height="1" fill="var(--color-border)" />
             </>
           ) : listening ? (
             <>
-              {/* attentive eyes looking toward you */}
               <rect x="5" y="7" width="2" height="2" fill="var(--color-border)" />
               <rect x="9" y="7" width="2" height="2" fill="var(--color-border)" />
               <rect x="6" y="7" width="1" height="1" fill={fill} />
               <rect x="10" y="7" width="1" height="1" fill={fill} />
-              {/* soft closed smile */}
               <rect x="6" y="10" width="4" height="1" fill="var(--color-border)" />
-              {/* cupped ear on the side */}
               <g className="animate-ear">
                 <rect x="0" y="6" width="2" height="4" fill={shade} />
                 <rect x="0" y="5" width="1" height="1" fill={shade} />
@@ -152,19 +146,14 @@ export function AgentSprite({
           )}
 
           <g
-            className={
-              status === 'working'
-                ? 'animate-typing'
-                : asking
-                  ? 'animate-hand-raise'
-                  : ''
-            }
+            className={status === 'working' ? 'animate-typing' : asking ? 'animate-chin-think' : ''}
             style={{ transformOrigin: '13px 8px', transformBox: 'view-box' }}
           >
             {asking ? (
+              // hand to chin — thinking
               <>
-                <rect x="13" y="3" width="2" height="5" fill={shade} />
-                <rect x="12" y="2" width="2" height="2" fill={shade} />
+                <rect x="12" y="9" width="2" height="3" fill={shade} />
+                <rect x="11" y="9" width="2" height="2" fill={shade} />
               </>
             ) : listening ? (
               <rect x="13" y="7" width="2" height="4" fill={shade} />
@@ -173,26 +162,14 @@ export function AgentSprite({
             )}
           </g>
           <g
-            className={
-              status === 'working'
-                ? 'animate-typing'
-                : asking
-                  ? 'animate-hand-raise'
-                  : ''
-            }
+            className={status === 'working' ? 'animate-typing' : ''}
             style={{
               transformOrigin: '3px 8px',
               transformBox: 'view-box',
-              animationDelay: asking ? '0.12s' : '0.09s',
+              animationDelay: '0.09s',
             }}
           >
-            {asking ? (
-              <>
-                <rect x="1" y="3" width="2" height="5" fill={shade} />
-                <rect x="2" y="2" width="2" height="2" fill={shade} />
-              </>
-            ) : listening ? (
-              // hand near ear — listening gesture
+            {listening ? (
               <rect x="1" y="6" width="2" height="3" fill={shade} />
             ) : (
               <rect x="1" y="8" width="2" height="3" fill={shade} />
@@ -219,7 +196,7 @@ export function AgentSprite({
               : 'bg-card text-card-foreground'
         }`}
       >
-        {asking ? `${agent.name}?` : agent.name}
+        {agent.name}
       </div>
     </button>
   )

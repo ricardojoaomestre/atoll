@@ -5,7 +5,7 @@ export const STATUS_LABEL: Record<AgentStatus, string> = {
   working: 'WORKING',
   listening: 'LISTENING',
   done: 'TASK DONE',
-  'needs-input': 'ASKING',
+  'needs-input': 'WONDERING',
 }
 
 export const STATUS_CLASS: Record<AgentStatus, string> = {
