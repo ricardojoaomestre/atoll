@@ -44,7 +44,7 @@ export function WorkspaceCard({ workspace }: WorkspaceCardProps) {
       </div>
       {needs > 0 && (
         <div className="pixel-box mt-3 animate-pop bg-warning px-2 py-1 font-display text-[8px] text-primary-foreground">
-          ! {needs} NEED YOU
+          ? {needs} ASKING
         </div>
       )}
     </Link>

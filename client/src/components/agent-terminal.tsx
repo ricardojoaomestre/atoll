@@ -7,8 +7,8 @@ import { STATUS_CLASS, STATUS_LABEL } from '../lib/status'
 import type { Agent } from '../types'
 
 interface AgentTerminalProps {
-  workspaceId: string
   agent: Agent
+  visible: boolean
   onClose: () => void
   onSubAgent: () => void
   onDismiss: () => void
@@ -16,12 +16,17 @@ interface AgentTerminalProps {
 
 export function AgentTerminal({
   agent,
+  visible,
   onClose,
   onSubAgent,
   onDismiss,
 }: AgentTerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
+  const fitRef = useRef<FitAddon | null>(null)
+  const socketRef = useRef<WebSocket | null>(null)
+  const visibleRef = useRef(visible)
+  visibleRef.current = visible
 
   useEffect(() => {
     const el = containerRef.current
@@ -45,13 +50,15 @@ export function AgentTerminal({
     term.loadAddon(new WebLinksAddon())
     term.open(el)
     fit.fit()
-    term.focus()
     termRef.current = term
+    fitRef.current = fit
 
     const socket = new WebSocket(wsUrl(`/ws/agents/${agent.id}`))
     socket.binaryType = 'arraybuffer'
+    socketRef.current = socket
 
     const sendResize = () => {
+      if (!visibleRef.current) return
       fit.fit()
       if (socket.readyState === WebSocket.OPEN) {
         socket.send(
@@ -97,11 +104,41 @@ export function AgentTerminal({
       socket.close()
       term.dispose()
       termRef.current = null
+      fitRef.current = null
+      socketRef.current = null
     }
   }, [agent.id])
 
+  useEffect(() => {
+    if (!visible) return
+    const term = termRef.current
+    const fit = fitRef.current
+    const socket = socketRef.current
+    if (!term || !fit) return
+
+    const id = window.requestAnimationFrame(() => {
+      fit.fit()
+      term.focus()
+      if (socket?.readyState === WebSocket.OPEN) {
+        socket.send(
+          JSON.stringify({
+            type: 'resize',
+            cols: term.cols,
+            rows: term.rows,
+          }),
+        )
+      }
+    })
+    return () => window.cancelAnimationFrame(id)
+  }, [visible])
+
   return (
-    <aside className="pixel-box animate-in fixed inset-x-3 inset-y-3 z-30 flex w-auto flex-col bg-card sm:inset-y-4 sm:right-4 sm:left-auto sm:w-[min(520px,calc(100vw-2rem))]">
+    <aside
+      className={`pixel-box fixed inset-x-3 inset-y-3 z-30 flex w-auto flex-col bg-card sm:inset-y-4 sm:right-4 sm:left-auto sm:w-[min(520px,calc(100vw-2rem))] ${
+        visible ? 'animate-in' : 'pointer-events-none invisible'
+      }`}
+      aria-hidden={!visible}
+    >
       <header className="flex items-center gap-2 border-b-[3px] border-border p-3">
         <span className="font-display text-xs">{agent.name}</span>
         <span
@@ -112,9 +149,10 @@ export function AgentTerminal({
         <button
           type="button"
           onClick={onClose}
-          className="pixel-btn ml-auto bg-destructive px-2 py-1 text-destructive-foreground"
+          className="pixel-btn ml-auto bg-muted px-2 py-1"
+          title="Hide terminal (keeps session)"
         >
-          X
+          HIDE
         </button>
       </header>
 
@@ -131,7 +169,7 @@ export function AgentTerminal({
         <button
           type="button"
           onClick={onDismiss}
-          className="pixel-btn bg-muted px-2 py-2"
+          className="pixel-btn bg-destructive px-2 py-2 text-destructive-foreground"
         >
           DISMISS
         </button>

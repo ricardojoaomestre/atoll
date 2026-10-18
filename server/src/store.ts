@@ -41,9 +41,12 @@ export async function loadState() {
         ...ws,
         agents: (ws.agents ?? []).map((agent) => ({
           ...agent,
-          status: agent.status === 'working' || agent.status === 'needs-input'
-            ? 'idle'
-            : agent.status,
+          status:
+            agent.status === 'working'
+            || agent.status === 'needs-input'
+            || agent.status === 'listening'
+              ? 'idle'
+              : agent.status,
         })),
       })),
     }

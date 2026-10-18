@@ -169,6 +169,32 @@
   50% { transform: rotate(-18deg); }
 }
 
+@keyframes plead {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-3px) scale(1.04); }
+}
+
+@keyframes hand-raise {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(10deg); }
+}
+
+@keyframes listen {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-2px) rotate(-2deg); }
+}
+
+@keyframes ear {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(1.15); }
+}
+
+@keyframes listen-dots {
+  0%, 20% { opacity: 0.25; }
+  40% { opacity: 1; }
+  100% { opacity: 0.25; }
+}
+
 @keyframes slide-in-from-right {
   from { transform: translateX(24px); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
@@ -182,6 +208,11 @@
 .animate-puff { animation: puff 1s ease-in-out infinite; }
 .animate-typing { animation: typing 0.35s ease-in-out infinite; }
 .animate-wave { animation: wave 0.6s ease-in-out infinite; }
+.animate-plead { animation: plead 0.9s ease-in-out infinite; }
+.animate-hand-raise { animation: hand-raise 0.7s ease-in-out infinite; }
+.animate-listen { animation: listen 1.4s ease-in-out infinite; }
+.animate-ear { animation: ear 1.2s ease-in-out infinite; transform-origin: 1px 8px; }
+.animate-listen-dots { animation: listen-dots 1.4s ease-in-out infinite; }
 .animate-in { animation: slide-in-from-right 0.2s ease-out; }
 
 .xterm {

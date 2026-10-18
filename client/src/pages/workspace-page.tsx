@@ -18,7 +18,19 @@ export function WorkspacePage() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [openTerminalIds, setOpenTerminalIds] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
+
+  function openTerminal(agentId: string) {
+    setSelectedId(agentId)
+    setOpenTerminalIds((prev) =>
+      prev.includes(agentId) ? prev : [...prev, agentId],
+    )
+  }
+
+  function hideTerminal() {
+    setSelectedId(null)
+  }
 
   const refresh = useCallback(async () => {
     if (!id) return
@@ -98,14 +110,13 @@ export function WorkspacePage() {
   }
 
   const roots = workspace.agents.filter((a) => !a.parentId)
-  const selected = workspace.agents.find((a) => a.id === selectedId) ?? null
 
   async function onSpawn() {
     setBusy(true)
     try {
       const agent = await spawnAgent(workspace!.id)
       await refresh()
-      setSelectedId(agent.id)
+      openTerminal(agent.id)
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Spawn failed')
     } finally {
@@ -118,7 +129,7 @@ export function WorkspacePage() {
     try {
       const agent = await spawnSubAgent(workspace!.id, parent.id)
       await refresh()
-      setSelectedId(agent.id)
+      openTerminal(agent.id)
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Sub-agent failed')
     } finally {
@@ -130,6 +141,7 @@ export function WorkspacePage() {
     setBusy(true)
     try {
       await dismissAgent(workspace!.id, agent.id)
+      setOpenTerminalIds((prev) => prev.filter((id) => id !== agent.id))
       if (selectedId === agent.id) setSelectedId(null)
       await refresh()
     } catch (err) {
@@ -155,11 +167,14 @@ export function WorkspacePage() {
           <span className="pixel-box bg-secondary px-2 py-1 text-secondary-foreground">
             ⚙ {countByStatus(workspace.agents, 'working')}
           </span>
+          <span className="pixel-box bg-primary px-2 py-1 text-primary-foreground">
+            ··· {countByStatus(workspace.agents, 'listening')}
+          </span>
           <span className="pixel-box bg-warning px-2 py-1 text-primary-foreground">
-            ! {countByStatus(workspace.agents, 'needs-input')}
+            ? {countByStatus(workspace.agents, 'needs-input')}
           </span>
           <span className="pixel-box bg-success px-2 py-1 text-primary-foreground">
-            ★ {countByStatus(workspace.agents, 'done')}
+            ✓ {countByStatus(workspace.agents, 'done')}
           </span>
         </div>
         <button
@@ -187,21 +202,7 @@ export function WorkspacePage() {
               <AgentSprite
                 agent={agent}
                 selected={selectedId === agent.id}
-                onClick={() => {
-                  setSelectedId(agent.id)
-                  if (agent.status === 'done') {
-                    setWorkspace((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            agents: prev.agents.map((a) =>
-                              a.id === agent.id ? { ...a, status: 'idle' } : a,
-                            ),
-                          }
-                        : prev,
-                    )
-                  }
-                }}
+                onClick={() => openTerminal(agent.id)}
               />
               {workspace.agents
                 .filter((a) => a.parentId === agent.id)
@@ -211,7 +212,7 @@ export function WorkspacePage() {
                     small
                     agent={child}
                     selected={selectedId === child.id}
-                    onClick={() => setSelectedId(child.id)}
+                    onClick={() => openTerminal(child.id)}
                   />
                 ))}
             </div>
@@ -220,15 +221,18 @@ export function WorkspacePage() {
         <Island hue={workspace.hue} wide />
       </section>
 
-      {selected && (
-        <AgentTerminal
-          workspaceId={workspace.id}
-          agent={selected}
-          onClose={() => setSelectedId(null)}
-          onSubAgent={() => void onSub(selected)}
-          onDismiss={() => void onDismiss(selected)}
-        />
-      )}
+      {workspace.agents
+        .filter((agent) => openTerminalIds.includes(agent.id))
+        .map((agent) => (
+          <AgentTerminal
+            key={agent.id}
+            agent={agent}
+            visible={selectedId === agent.id}
+            onClose={hideTerminal}
+            onSubAgent={() => void onSub(agent)}
+            onDismiss={() => void onDismiss(agent)}
+          />
+        ))}
     </main>
   )
 }

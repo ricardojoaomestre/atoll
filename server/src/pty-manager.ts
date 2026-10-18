@@ -3,10 +3,12 @@ import * as pty from 'node-pty-prebuilt-multiarch'
 import type { IPty } from 'node-pty-prebuilt-multiarch'
 import type { WebSocket } from 'ws'
 import { resolveAgentBin } from './agent-bin.js'
+import { looksLikePermissionPrompt } from './permission-detect.js'
 import { updateAgent } from './store.js'
 import type { AgentStatus } from './types.js'
 
-const NEEDS_INPUT_MS = 8_000
+const IDLE_DONE_MS = 8_000
+const IDLE_PERMISSION_MS = 1_500
 
 interface Session {
   agentId: string
@@ -135,7 +137,11 @@ class PtyManager extends EventEmitter {
         if (parsed.type === 'input' && typeof parsed.data === 'string') {
           session.pty.write(parsed.data)
           session.lastOutputAt = Date.now()
-          if (session.status === 'needs-input') {
+          if (
+            session.status === 'needs-input'
+            || session.status === 'done'
+            || session.status === 'listening'
+          ) {
             this.setStatus(session, 'working')
           }
           this.armIdleTimer(session)
@@ -146,7 +152,11 @@ class PtyManager extends EventEmitter {
       }
       session.pty.write(text)
       session.lastOutputAt = Date.now()
-      if (session.status === 'needs-input') {
+      if (
+        session.status === 'needs-input'
+        || session.status === 'done'
+        || session.status === 'listening'
+      ) {
         this.setStatus(session, 'working')
       }
       this.armIdleTimer(session)
@@ -189,13 +199,16 @@ class PtyManager extends EventEmitter {
 
   private armIdleTimer(session: Session) {
     this.clearIdleTimer(session)
-    if (session.status === 'done') return
+    const permission = looksLikePermissionPrompt(session.replay)
+    const delay = permission ? IDLE_PERMISSION_MS : IDLE_DONE_MS
     session.idleTimer = setTimeout(() => {
       if (!this.sessions.has(session.agentId)) return
-      if (Date.now() - session.lastOutputAt >= NEEDS_INPUT_MS) {
-        this.setStatus(session, 'needs-input')
-      }
-    }, NEEDS_INPUT_MS)
+      if (Date.now() - session.lastOutputAt < delay) return
+      this.setStatus(
+        session,
+        looksLikePermissionPrompt(session.replay) ? 'needs-input' : 'listening',
+      )
+    }, delay)
   }
 
   private clearIdleTimer(session: Session) {

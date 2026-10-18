@@ -16,6 +16,8 @@ export function AgentSprite({
   const fill = `oklch(0.72 0.17 ${agent.color})`
   const shade = `oklch(0.45 0.14 ${agent.color})`
   const status = agent.status
+  const asking = status === 'needs-input'
+  const listening = status === 'listening'
 
   return (
     <button
@@ -27,19 +29,24 @@ export function AgentSprite({
         transformOrigin: 'bottom',
       }}
     >
-      <div className="absolute -top-12 h-10">
-        {status === 'needs-input' && (
+      <div className="absolute -top-12 flex h-10 items-end justify-center">
+        {asking && (
           <div className="pixel-box animate-pop bg-warning px-2 py-1 font-display text-xs text-primary-foreground">
-            <span className="animate-blink">!</span>
+            <span className="animate-blink">?</span>
+          </div>
+        )}
+        {listening && (
+          <div className="pixel-box animate-pop bg-primary px-2 py-1 font-display text-[8px] text-primary-foreground">
+            <span className="animate-listen-dots">···</span>
           </div>
         )}
         {status === 'done' && (
           <div className="pixel-box animate-pop bg-success px-2 py-1 font-display text-xs text-primary-foreground">
-            ★
+            ✓
           </div>
         )}
         {status === 'working' && (
-          <div className="flex gap-1 pt-4">
+          <div className="flex gap-1 pb-1">
             {[0, 1, 2].map((i) => (
               <span
                 key={i}
@@ -57,7 +64,11 @@ export function AgentSprite({
             ? 'animate-bob'
             : status === 'done'
               ? 'animate-jump'
-              : ''
+              : asking
+                ? 'animate-plead'
+                : listening
+                  ? 'animate-listen'
+                  : ''
         }
       >
         <svg
@@ -72,7 +83,13 @@ export function AgentSprite({
             y="0"
             width="2"
             height="2"
-            fill={status === 'needs-input' ? 'var(--color-warning)' : 'var(--color-primary)'}
+            fill={
+              asking
+                ? 'var(--color-warning)'
+                : listening
+                  ? 'var(--color-primary)'
+                  : 'var(--color-primary)'
+            }
           />
           <rect x="7.5" y="2" width="1" height="2" fill="var(--color-border)" />
           <rect
@@ -85,6 +102,7 @@ export function AgentSprite({
             strokeWidth="0.5"
           />
           <rect x="3" y="11" width="10" height="2" fill={shade} />
+
           {status === 'done' ? (
             <>
               <path
@@ -99,45 +117,88 @@ export function AgentSprite({
                 strokeWidth="0.7"
                 fill="none"
               />
+              <rect x="6" y="10" width="4" height="1" fill="var(--color-border)" />
             </>
-          ) : status === 'needs-input' ? (
+          ) : asking ? (
             <>
-              <rect x="5" y="6" width="2" height="3" fill="var(--color-border)" />
-              <rect x="9" y="6" width="2" height="3" fill="var(--color-border)" />
+              <rect x="4" y="6" width="3" height="3" fill="var(--color-border)" />
+              <rect x="9" y="6" width="3" height="3" fill="var(--color-border)" />
+              <rect x="5" y="7" width="1" height="1" fill={fill} />
+              <rect x="10" y="7" width="1" height="1" fill={fill} />
+              <rect x="6" y="10" width="4" height="2" fill="var(--color-border)" />
+            </>
+          ) : listening ? (
+            <>
+              {/* attentive eyes looking toward you */}
+              <rect x="5" y="7" width="2" height="2" fill="var(--color-border)" />
+              <rect x="9" y="7" width="2" height="2" fill="var(--color-border)" />
+              <rect x="6" y="7" width="1" height="1" fill={fill} />
+              <rect x="10" y="7" width="1" height="1" fill={fill} />
+              {/* soft closed smile */}
+              <rect x="6" y="10" width="4" height="1" fill="var(--color-border)" />
+              {/* cupped ear on the side */}
+              <g className="animate-ear">
+                <rect x="0" y="6" width="2" height="4" fill={shade} />
+                <rect x="0" y="5" width="1" height="1" fill={shade} />
+                <rect x="0" y="10" width="1" height="1" fill={shade} />
+              </g>
             </>
           ) : (
             <>
               <rect x="5" y="7" width="2" height="2" fill="var(--color-border)" />
               <rect x="9" y="7" width="2" height="2" fill="var(--color-border)" />
+              <rect x="6" y="10" width="4" height="1" fill="var(--color-border)" />
             </>
           )}
-          {status === 'needs-input' ? (
-            <rect x="7" y="10" width="2" height="1" fill="var(--color-border)" />
-          ) : (
-            <rect x="6" y="10" width="4" height="1" fill="var(--color-border)" />
-          )}
+
           <g
             className={
               status === 'working'
                 ? 'animate-typing'
-                : status === 'needs-input'
-                  ? 'animate-wave'
+                : asking
+                  ? 'animate-hand-raise'
                   : ''
             }
             style={{ transformOrigin: '13px 8px', transformBox: 'view-box' }}
           >
-            <rect x="13" y="8" width="2" height="3" fill={shade} />
+            {asking ? (
+              <>
+                <rect x="13" y="3" width="2" height="5" fill={shade} />
+                <rect x="12" y="2" width="2" height="2" fill={shade} />
+              </>
+            ) : listening ? (
+              <rect x="13" y="7" width="2" height="4" fill={shade} />
+            ) : (
+              <rect x="13" y="8" width="2" height="3" fill={shade} />
+            )}
           </g>
           <g
-            className={status === 'working' ? 'animate-typing' : ''}
+            className={
+              status === 'working'
+                ? 'animate-typing'
+                : asking
+                  ? 'animate-hand-raise'
+                  : ''
+            }
             style={{
               transformOrigin: '3px 8px',
               transformBox: 'view-box',
-              animationDelay: '0.09s',
+              animationDelay: asking ? '0.12s' : '0.09s',
             }}
           >
-            <rect x="1" y="8" width="2" height="3" fill={shade} />
+            {asking ? (
+              <>
+                <rect x="1" y="3" width="2" height="5" fill={shade} />
+                <rect x="2" y="2" width="2" height="2" fill={shade} />
+              </>
+            ) : listening ? (
+              // hand near ear — listening gesture
+              <rect x="1" y="6" width="2" height="3" fill={shade} />
+            ) : (
+              <rect x="1" y="8" width="2" height="3" fill={shade} />
+            )}
           </g>
+
           <rect x="5" y="13" width="2" height="3" fill={shade} />
           <rect x="9" y="13" width="2" height="3" fill={shade} />
           {status === 'working' && (
@@ -149,8 +210,16 @@ export function AgentSprite({
         </svg>
       </div>
 
-      <div className="pixel-box mt-1 bg-card px-2 py-0.5 font-display text-[8px] text-card-foreground group-hover:bg-primary group-hover:text-primary-foreground">
-        {agent.name}
+      <div
+        className={`pixel-box mt-1 px-2 py-0.5 font-display text-[8px] group-hover:bg-primary group-hover:text-primary-foreground ${
+          asking
+            ? 'bg-warning text-primary-foreground'
+            : listening
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-card text-card-foreground'
+        }`}
+      >
+        {asking ? `${agent.name}?` : agent.name}
       </div>
     </button>
   )
