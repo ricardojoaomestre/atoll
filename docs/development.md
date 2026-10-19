@@ -57,7 +57,7 @@ Production serving of the SPA behind the API is not fully wired in-repo; today t
 | `PORT` | server | API port (default `8787`) |
 | `CURSOR_AGENT_BIN` | server | Override path to `agent` executable |
 
-State file: `~/.cursor-isles/state.json` (created automatically).
+State file: `~/.atoll/state.json` (created automatically).
 
 ## PTY package note
 

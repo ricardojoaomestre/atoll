@@ -17,7 +17,7 @@ export function MapPage() {
       <header className="relative mx-auto flex max-w-5xl flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl leading-relaxed text-primary sm:text-3xl">
-            CURSOR ISLES
+            ATOLL
           </h1>
           <p className="mt-3 font-mono text-2xl text-muted-foreground">
             {loading

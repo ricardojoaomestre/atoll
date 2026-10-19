@@ -42,7 +42,7 @@ These rules exist because past bugs or product decisions were explicit. Future a
 ## Persistence
 
 - **Do not** store PTY output in `state.json` (size, privacy). Replay is in-memory only.
-- **Do not** commit `~/.cursor-isles/state.json` or user paths from local testing.
+- **Do not** commit `~/.atoll/state.json` or user paths from local testing.
 
 ## Git / process
 

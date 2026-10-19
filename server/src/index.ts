@@ -283,7 +283,7 @@ async function main() {
   })
 
   await app.listen({ host: HOST, port: PORT })
-  console.log(`cursor-isles api on http://${HOST}:${PORT}`)
+  console.log(`atoll api on http://${HOST}:${PORT}`)
 }
 
 main().catch((err) => {

@@ -1,10 +1,10 @@
-# Cursor Isles — guide for coding agents
+# Atoll — guide for coding agents
 
 Read this before changing the repo. Human-oriented setup stays in [README.md](README.md).
 
 ## What this project is
 
-**Cursor Isles** is a local-only web UI that maps Cursor CLI (`agent`) sessions onto a pixel-art “island” metaphor:
+**Atoll** is a local-only web UI that maps agent CLI sessions (Cursor `agent`, Claude `claude`) onto a pixel-art “island” metaphor:
 
 - **Workspaces** = folders on disk (`agent --workspace <path>`)
 - **Agents** = interactive PTY sessions running the real `agent` TUI

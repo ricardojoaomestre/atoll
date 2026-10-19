@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Cursor Isles gives a visual “map → island → agent” UI for **local** Cursor Agent CLI sessions. The terminal content is the real `agent` interactive TUI over a PTY; the pixel sprites and badges are a thin layer on top.
+Atoll gives a visual “map → island → agent” UI for **local** agent CLI sessions (Cursor and Claude). The terminal content is the real CLI over a PTY; the pixel sprites and badges are a thin layer on top.
 
 ## User flows
 

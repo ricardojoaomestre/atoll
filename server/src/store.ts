@@ -4,7 +4,8 @@ import { dirname, join } from 'node:path'
 import { parseCliId } from './cli/index.js'
 import type { AgentRecord, AppState, CliId, WorkspaceRecord } from './types.js'
 
-const STATE_PATH = join(homedir(), '.cursor-isles', 'state.json')
+const STATE_PATH = join(homedir(), '.atoll', 'state.json')
+const LEGACY_STATE_PATH = join(homedir(), '.cursor-isles', 'state.json')
 
 const EMPTY: AppState = { workspaces: [] }
 
@@ -52,9 +53,25 @@ async function persistNow() {
   await persist()
 }
 
+async function readStateFile() {
+  try {
+    return await readFile(STATE_PATH, 'utf8')
+  } catch {
+    try {
+      const legacy = await readFile(LEGACY_STATE_PATH, 'utf8')
+      await mkdir(dirname(STATE_PATH), { recursive: true })
+      await writeFile(STATE_PATH, legacy, 'utf8')
+      return legacy
+    } catch {
+      return null
+    }
+  }
+}
+
 export async function loadState() {
   try {
-    const raw = await readFile(STATE_PATH, 'utf8')
+    const raw = await readStateFile()
+    if (raw === null) throw new Error('missing')
     const parsed = JSON.parse(raw) as AppState
     state = {
       settings: { cli: parseCliId(parsed.settings?.cli) },

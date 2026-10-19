@@ -1,7 +1,7 @@
 # Project structure
 
 ```
-cursor-isles/
+atoll/
 ├── package.json          # npm run dev | install:all | build
 ├── README.md             # Human quick start
 ├── AGENTS.md             # Entry point for AI agents
@@ -32,7 +32,7 @@ cursor-isles/
     ├── package.json      # node-pty-prebuilt-multiarch (not plain node-pty)
     └── src/
         ├── index.ts      # Fastify REST + WebSocket routes
-        ├── store.ts      # ~/.cursor-isles/state.json
+        ├── store.ts      # ~/.atoll/state.json
         ├── pty-manager.ts
         ├── permission-detect.ts
         ├── task-detect.ts   # Cursor TUI patterns, used by cli/cursor.ts
@@ -51,7 +51,7 @@ cursor-isles/
 
 ## Persistence
 
-- Path: `~/.cursor-isles/state.json`
+- Path: `~/.atoll/state.json` (copied from `~/.cursor-isles/state.json` on first launch if the new file is missing)
 - Workspaces + agent **metadata** only (name, color, parentId, source, taskKey, last known status).
 - **PTY processes are in-memory**; server restart clears live sessions; store resets `working` / `listening` / `needs-question` / `needs-permission` (and legacy `needs-input`) to `idle` on load.
 
