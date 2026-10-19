@@ -29,4 +29,5 @@ export interface Workspace {
   agents: Agent[]
   createdAt: string
   firstCommitAt: string | null
+  hasCamp: boolean
 }

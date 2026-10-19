@@ -2,6 +2,7 @@ interface IslandProps {
   hue: number
   wide?: boolean
   trees?: number
+  camp?: boolean
   className?: string
 }
 
@@ -60,7 +61,46 @@ const palms = [
   { left: '63%', ground: '33%', scale: 0.72, flip: true, delay: '1.1s' },
 ]
 
-export function Island({ hue, wide, trees = 1, className = '' }: IslandProps) {
+function Tent() {
+  const cloth = 'oklch(0.82 0.05 95)'
+  const shade = 'oklch(0.58 0.06 75)'
+  const door = 'oklch(0.22 0.03 55)'
+
+  return (
+    <svg viewBox="0 0 16 12" width={34} height={26} shapeRendering="crispEdges" aria-hidden>
+      <rect x="7" y="0" width="2" height="1" fill={shade} />
+      <rect x="5" y="1" width="6" height="1" fill={cloth} />
+      <rect x="4" y="2" width="8" height="1" fill={cloth} />
+      <rect x="3" y="3" width="10" height="1" fill={shade} />
+      <rect x="2" y="4" width="12" height="1" fill={cloth} />
+      <rect x="1" y="5" width="14" height="6" fill={cloth} />
+      <rect x="1" y="5" width="2" height="6" fill={shade} />
+      <rect x="13" y="5" width="2" height="6" fill={shade} />
+      <rect x="6" y="7" width="4" height="4" fill={door} />
+      <rect x="7" y="8" width="1" height="1" fill="oklch(0.9 0.12 95)" />
+    </svg>
+  )
+}
+
+function Campfire() {
+  return (
+    <svg viewBox="0 0 12 12" width={24} height={24} shapeRendering="crispEdges" aria-hidden>
+      <g className="animate-flicker" style={{ transformOrigin: '6px 8px', transformBox: 'view-box' }}>
+        <rect x="5" y="0" width="2" height="2" fill="oklch(0.95 0.14 100)" />
+        <rect x="4" y="2" width="4" height="2" fill="oklch(0.78 0.18 55)" />
+        <rect x="5" y="1" width="2" height="3" fill="oklch(0.86 0.18 75)" />
+        <rect x="3" y="4" width="2" height="2" fill="oklch(0.7 0.2 45)" />
+        <rect x="7" y="4" width="2" height="2" fill="oklch(0.72 0.19 50)" />
+      </g>
+      <rect x="1" y="7" width="10" height="1" fill="oklch(0.45 0.06 55)" />
+      <rect x="0" y="8" width="5" height="2" fill="oklch(0.38 0.05 50)" />
+      <rect x="7" y="8" width="5" height="2" fill="oklch(0.32 0.04 45)" />
+      <rect x="3" y="9" width="6" height="2" fill="oklch(0.42 0.05 60)" />
+    </svg>
+  )
+}
+
+export function Island({ hue, wide, trees = 1, camp = false, className = '' }: IslandProps) {
   const grass = `oklch(0.72 0.17 ${hue})`
   const grassShade = `oklch(0.58 0.14 ${hue})`
   const wave = 'oklch(0.72 0.07 235)'
@@ -136,6 +176,22 @@ export function Island({ hue, wide, trees = 1, className = '' }: IslandProps) {
           <rect x="60" y="86" width="10" height="2" />
         </g>
       </svg>
+      {camp && (
+        <>
+          <div
+            className="pointer-events-none absolute"
+            style={{ left: '46%', top: '37%', zIndex: 3, transform: 'translate(-50%, -100%)' }}
+          >
+            <Tent />
+          </div>
+          <div
+            className="pointer-events-none absolute"
+            style={{ left: '60%', top: '42%', zIndex: 4, transform: 'translate(-50%, -100%)' }}
+          >
+            <Campfire />
+          </div>
+        </>
+      )}
       {palms.slice(0, Math.min(palms.length, Math.max(1, trees))).map((palm) => (
         <div
           key={`${palm.left}-${palm.scale}`}

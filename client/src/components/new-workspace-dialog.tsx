@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { pickFolder } from '../lib/api'
 
 interface NewWorkspaceDialogProps {
   open: boolean
@@ -14,7 +15,21 @@ export function NewWorkspaceDialog({
   const [name, setName] = useState('')
   const [path, setPath] = useState('')
   const [busy, setBusy] = useState(false)
+  const [picking, setPicking] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  async function browse() {
+    setPicking(true)
+    setError(null)
+    try {
+      const { path: selected } = await pickFolder()
+      if (selected) setPath(selected)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not open folder picker')
+    } finally {
+      setPicking(false)
+    }
+  }
 
   if (!open) return null
 
@@ -61,16 +76,32 @@ export function NewWorkspaceDialog({
           />
         </label>
 
-        <label className="mt-4 block font-display text-[8px] text-muted-foreground">
-          PATH
-          <input
-            value={path}
-            onChange={(e) => setPath(e.target.value)}
-            className="pixel-box mt-2 w-full bg-terminal px-3 py-2 font-mono text-2xl text-terminal-foreground outline-none"
-            placeholder="~/code/web-shop"
-            required
-          />
-        </label>
+        <div className="mt-4">
+          <label
+            htmlFor="workspace-path"
+            className="block font-display text-[8px] text-muted-foreground"
+          >
+            PATH
+          </label>
+          <div className="mt-2 flex items-stretch gap-2">
+            <input
+              id="workspace-path"
+              value={path}
+              onChange={(e) => setPath(e.target.value)}
+              className="pixel-box min-w-0 flex-1 bg-terminal px-3 py-2 font-mono text-2xl text-terminal-foreground outline-none"
+              placeholder="~/code/web-shop"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => void browse()}
+              disabled={busy || picking}
+              className="pixel-btn shrink-0 bg-muted px-3"
+            >
+              {picking ? '...' : 'BROWSE'}
+            </button>
+          </div>
+        </div>
 
         {error && (
           <p className="mt-3 font-mono text-xl text-destructive">{error}</p>

@@ -67,6 +67,7 @@ export function WorkspaceCard({ workspace }: WorkspaceCardProps) {
       <Island
         hue={workspace.hue}
         trees={treeCount(workspace.firstCommitAt)}
+        camp={workspace.hasCamp}
         className="transition-transform duration-75 ease-out group-hover:-translate-y-1"
       />
       <div className="mt-3 w-64 text-center">

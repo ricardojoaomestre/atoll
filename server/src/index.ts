@@ -16,15 +16,22 @@ import {
 } from './store.js'
 import { ptyManager } from './pty-manager.js'
 import { firstCommitAt } from './first-commit.js'
+import { hasPushedToOrigin } from './origin.js'
+import { pickFolder } from './pick-folder.js'
 import type { WorkspaceRecord } from './types.js'
 
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.PORT ?? 8787)
 
 async function presentWorkspace(workspace: WorkspaceRecord) {
+  const [firstCommit, hasCamp] = await Promise.all([
+    firstCommitAt(workspace.path),
+    hasPushedToOrigin(workspace.path),
+  ])
   return {
     ...workspace,
-    firstCommitAt: await firstCommitAt(workspace.path),
+    firstCommitAt: firstCommit,
+    hasCamp,
     agents: workspace.agents.map((agent) => ({
       ...agent,
       status: ptyManager.getSession(agent.id)?.status ?? agent.status,
@@ -40,6 +47,16 @@ async function main() {
   await app.register(websocket)
 
   app.get('/api/health', async () => ({ ok: true }))
+
+  app.post('/api/pick-folder', async (_req, reply) => {
+    try {
+      const path = await pickFolder()
+      return { path }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not open folder picker'
+      return reply.code(400).send({ error: message })
+    }
+  })
 
   app.get('/api/workspaces', async () => {
     const workspaces = await listWorkspaces()

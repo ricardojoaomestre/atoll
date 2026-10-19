@@ -261,7 +261,12 @@ export function WorkspacePage() {
                 </div>
               ))}
             </div>
-            <Island hue={workspace.hue} wide trees={treeCount(workspace.firstCommitAt)} />
+            <Island
+              hue={workspace.hue}
+              wide
+              trees={treeCount(workspace.firstCommitAt)}
+              camp={workspace.hasCamp}
+            />
           </div>
         </section>
 

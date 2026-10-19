@@ -21,6 +21,10 @@ export function getWorkspace(id: string) {
   return request<Workspace>(`/api/workspaces/${id}`)
 }
 
+export function pickFolder() {
+  return request<{ path: string | null }>('/api/pick-folder', { method: 'POST' })
+}
+
 export function createWorkspace(name: string, path: string) {
   return request<Workspace>('/api/workspaces', {
     method: 'POST',
