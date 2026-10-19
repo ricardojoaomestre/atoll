@@ -7,9 +7,14 @@
     "dev:server": "npm run dev --prefix server",
     "dev:client": "npm run dev --prefix client",
     "install:all": "npm install && npm install --prefix server && npm install --prefix client",
-    "build": "npm run build --prefix client && npm run build --prefix server"
+    "build": "npm run build --prefix client && npm run build --prefix server",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "npm run test --prefix client",
+    "test:e2e": "playwright test",
+    "typecheck": "npm run build --prefix client && npm run build --prefix server"
   },
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
     "concurrently": "^9.1.2"
   }
 }
