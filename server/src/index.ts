@@ -15,9 +15,22 @@ import {
   removeAgent,
 } from './store.js'
 import { ptyManager } from './pty-manager.js'
+import { firstCommitAt } from './first-commit.js'
+import type { WorkspaceRecord } from './types.js'
 
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.PORT ?? 8787)
+
+async function presentWorkspace(workspace: WorkspaceRecord) {
+  return {
+    ...workspace,
+    firstCommitAt: await firstCommitAt(workspace.path),
+    agents: workspace.agents.map((agent) => ({
+      ...agent,
+      status: ptyManager.getSession(agent.id)?.status ?? agent.status,
+    })),
+  }
+}
 
 async function main() {
   await loadState()
@@ -30,13 +43,7 @@ async function main() {
 
   app.get('/api/workspaces', async () => {
     const workspaces = await listWorkspaces()
-    return workspaces.map((ws) => ({
-      ...ws,
-      agents: ws.agents.map((agent) => ({
-        ...agent,
-        status: ptyManager.getSession(agent.id)?.status ?? agent.status,
-      })),
-    }))
+    return Promise.all(workspaces.map((ws) => presentWorkspace(ws)))
   })
 
   app.post<{
@@ -54,7 +61,7 @@ async function main() {
       return reply.code(400).send({ error: `path not readable: ${absolute}` })
     }
     const workspace = await createWorkspace(name, absolute)
-    return workspace
+    return presentWorkspace(workspace)
   })
 
   app.delete<{
@@ -71,13 +78,7 @@ async function main() {
   }>('/api/workspaces/:id', async (req, reply) => {
     const workspace = await getWorkspace(req.params.id)
     if (!workspace) return reply.code(404).send({ error: 'not found' })
-    return {
-      ...workspace,
-      agents: workspace.agents.map((agent) => ({
-        ...agent,
-        status: ptyManager.getSession(agent.id)?.status ?? agent.status,
-      })),
-    }
+    return presentWorkspace(workspace)
   })
 
   app.get<{

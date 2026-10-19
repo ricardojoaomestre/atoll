@@ -51,6 +51,21 @@
   input {
     font: inherit;
   }
+
+  a[href],
+  button:not(:disabled),
+  label[for],
+  summary,
+  select,
+  [role='button']:not([aria-disabled='true']),
+  [role='link'] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled='true'] {
+    cursor: not-allowed;
+  }
 }
 
 @layer utilities {
@@ -174,6 +189,16 @@
   50% { transform: rotate(-18deg); }
 }
 
+@keyframes drift {
+  0%, 100% { transform: translate(0); }
+  50% { transform: translate(5px); }
+}
+
+@keyframes sway {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+
 @keyframes wonder {
   0%, 100% { transform: translateY(0) rotate(0deg); }
   50% { transform: translateY(-2px) rotate(3deg); }
@@ -238,6 +263,8 @@
 .animate-puff { animation: puff 1s ease-in-out infinite; }
 .animate-typing { animation: typing 0.35s ease-in-out infinite; }
 .animate-wave { animation: wave 0.6s ease-in-out infinite; }
+.animate-drift { animation: drift 2.6s ease-in-out infinite; }
+.animate-sway { animation: sway 3.2s ease-in-out infinite; }
 .animate-wonder { animation: wonder 2s ease-in-out infinite; }
 .animate-chin-think { animation: chin-think 1.6s ease-in-out infinite; }
 .animate-question-float { animation: question-float 1.8s ease-in-out infinite; }
@@ -273,7 +300,9 @@
   .animate-sleep,
   .animate-zzz,
   .animate-beg,
-  .animate-beg-hands {
+  .animate-beg-hands,
+  .animate-drift,
+  .animate-sway {
     animation: none;
   }
 }

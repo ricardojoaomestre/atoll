@@ -28,4 +28,5 @@ export interface Workspace {
   hue: number
   agents: Agent[]
   createdAt: string
+  firstCommitAt: string | null
 }

@@ -11,6 +11,7 @@ import { AgentSprite } from '../components/agent-sprite'
 import { AgentTerminal } from '../components/agent-terminal'
 import { Island } from '../components/island'
 import { countByStatus } from '../lib/status'
+import { treeCount } from '../lib/tree-count'
 import type { Agent, Workspace } from '../types'
 
 export function WorkspacePage() {
@@ -229,8 +230,11 @@ export function WorkspacePage() {
               : 'scale-100 opacity-100'
           }`}
         >
-          <div className="animate-float w-full" style={{ animationDuration: '6s' }}>
-            <div className="relative flex min-h-56 flex-wrap items-end justify-center gap-10 px-6 pb-0">
+          <div
+            className="flex w-full flex-col animate-float"
+            style={{ animationDuration: '6s' }}
+          >
+            <div className="relative z-10 flex min-h-56 flex-wrap items-end justify-center gap-10 px-6 pb-0">
               {roots.length === 0 && (
                 <p className="pb-6 font-mono text-2xl text-muted-foreground">
                   An empty island... spawn your first agent!
@@ -257,7 +261,7 @@ export function WorkspacePage() {
                 </div>
               ))}
             </div>
-            <Island hue={workspace.hue} wide />
+            <Island hue={workspace.hue} wide trees={treeCount(workspace.firstCommitAt)} />
           </div>
         </section>
 
