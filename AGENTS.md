@@ -29,6 +29,8 @@ npm run install:all
 npm run dev
 ```
 
+`make` from the repo root does the same thing and opens the browser.
+
 - UI: http://127.0.0.1:5173  
 - API: http://127.0.0.1:8787 (localhost only)  
 - Requires `agent login` on the host machine.

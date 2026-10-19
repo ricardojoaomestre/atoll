@@ -1,5 +1,13 @@
 # Development
 
+## Fastest start
+
+```bash
+make
+```
+
+Installs dependencies, starts the UI and the API, and opens http://127.0.0.1:5173. The sections below are the same steps, split apart.
+
 ## Prerequisites
 
 - Node 20+
