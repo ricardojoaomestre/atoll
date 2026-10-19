@@ -10,6 +10,8 @@ export type AgentSource = 'pty' | 'task'
 
 export type CliId = 'cursor' | 'claude'
 
+export type SkyChoice = 'auto' | 'sunrise' | 'day' | 'sunset' | 'night'
+
 export interface AgentRecord {
   id: string
   workspaceId: string
@@ -35,6 +37,7 @@ export interface WorkspaceRecord {
 
 export interface AppSettings {
   cli: CliId
+  sky: SkyChoice
 }
 
 export interface AppState {

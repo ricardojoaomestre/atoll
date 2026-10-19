@@ -1,3 +1,4 @@
+import type { SkyChoice } from './time-of-day'
 import type { Agent, CliId, Workspace } from '../types'
 
 export interface CliChoice {
@@ -10,6 +11,7 @@ export interface CliChoice {
 
 export interface Settings {
   cli: CliId
+  sky: SkyChoice
   options: CliChoice[]
 }
 
@@ -38,10 +40,10 @@ export function getSettings() {
   return request<Settings>('/api/settings')
 }
 
-export function updateSettings(cli: CliId) {
+export function updateSettings(input: { cli: CliId; sky: SkyChoice }) {
   return request<Settings>('/api/settings', {
     method: 'PUT',
-    body: JSON.stringify({ cli }),
+    body: JSON.stringify(input),
   })
 }
 

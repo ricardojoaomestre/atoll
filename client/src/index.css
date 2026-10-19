@@ -34,9 +34,17 @@
     min-height: 100%;
   }
 
+  html {
+    background-color: var(--color-background);
+    background-image: var(--sky-wash);
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+    background-attachment: fixed;
+  }
+
   body {
     margin: 0;
-    background: var(--color-background);
+    background: transparent;
     color: var(--color-foreground);
     font-family: var(--font-mono);
     image-rendering: pixelated;
@@ -123,6 +131,12 @@
     animation: twinkle 8s linear infinite;
   }
 
+  [data-sky='sunrise'] .stars,
+  [data-sky='day'] .stars,
+  [data-sky='sunset'] .stars {
+    display: none;
+  }
+
   .bg-background { background-color: var(--color-background); }
   .bg-primary { background-color: var(--color-primary); }
   .bg-secondary { background-color: var(--color-secondary); }
@@ -140,6 +154,64 @@
   .text-destructive-foreground { color: var(--color-destructive-foreground); }
   .text-terminal-foreground { color: var(--color-terminal-foreground); }
   .border-border { border-color: var(--color-border); }
+}
+
+:root {
+  --sky-wash: none;
+}
+
+[data-sky='sunrise'] {
+  --color-background: #e08a4a;
+  --sky-wash: linear-gradient(#16122c 0%, #4a305f 28%, #b5526a 58%, #e07a52 82%, #e08a4a 100%);
+}
+
+[data-sky='day'] {
+  --color-background: #5aa6dc;
+  --sky-wash: linear-gradient(#102848 0%, #1a5694 36%, #3184c4 68%, #5aa6dc 100%);
+}
+
+[data-sky='sunset'] {
+  --color-background: #e07038;
+  --sky-wash: linear-gradient(#120c22 0%, #4e1e44 24%, #a83840 50%, #d85a30 76%, #e07038 100%);
+}
+
+[data-sky='night'] {
+  --sky-wash: none;
+}
+
+[data-sky='day'] .sky-title,
+[data-sky='sunrise'] .sky-title,
+[data-sky='sunset'] .sky-title {
+  text-shadow: 3px 3px 0 #1a1028;
+}
+
+[data-sky='day'] .sky-note,
+[data-sky='sunrise'] .sky-note,
+[data-sky='sunset'] .sky-note {
+  color: #f7f4ff;
+  text-shadow:
+    2px 0 0 #1a1028,
+    -2px 0 0 #1a1028,
+    0 2px 0 #1a1028,
+    0 -2px 0 #1a1028,
+    2px 2px 0 #1a1028,
+    -2px 2px 0 #1a1028,
+    2px -2px 0 #1a1028,
+    -2px -2px 0 #1a1028;
+}
+
+[data-sky='day'] .on-sky,
+[data-sky='sunrise'] .on-sky,
+[data-sky='sunset'] .on-sky {
+  text-shadow:
+    2px 0 0 #1a1028,
+    -2px 0 0 #1a1028,
+    0 2px 0 #1a1028,
+    0 -2px 0 #1a1028,
+    2px 2px 0 #1a1028,
+    -2px 2px 0 #1a1028,
+    2px -2px 0 #1a1028,
+    -2px -2px 0 #1a1028;
 }
 
 @keyframes twinkle {
@@ -204,6 +276,17 @@
   40% { transform: translateY(-1px) scale(1.08, 0.92); opacity: 0.85; }
   70% { transform: translateY(0) scale(0.94, 1.06); opacity: 1; }
 }
+
+@keyframes compass-needle {
+  0%, 100% { transform: rotate(-12deg); }
+  50% { transform: rotate(14deg); }
+}
+
+@keyframes glass-scan {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(6deg); }
+}
+
 
 @keyframes wonder {
   0%, 100% { transform: translateY(0) rotate(0deg); }
@@ -272,6 +355,8 @@
 .animate-drift { animation: drift 2.6s ease-in-out infinite; }
 .animate-sway { animation: sway 3.2s ease-in-out infinite; }
 .animate-flicker { animation: flicker 0.7s steps(2, end) infinite; }
+.animate-compass-needle { animation: compass-needle 2.6s ease-in-out infinite; }
+.animate-glass-scan { animation: glass-scan 3.2s ease-in-out infinite; }
 .animate-wonder { animation: wonder 2s ease-in-out infinite; }
 .animate-chin-think { animation: chin-think 1.6s ease-in-out infinite; }
 .animate-question-float { animation: question-float 1.8s ease-in-out infinite; }
@@ -310,8 +395,14 @@
   .animate-beg-hands,
   .animate-drift,
   .animate-sway,
-  .animate-flicker {
+  .animate-flicker,
+  .animate-compass-needle,
+  .animate-glass-scan {
     animation: none;
+  }
+
+  .sea-chart animateTransform {
+    display: none;
   }
 }
 

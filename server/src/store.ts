@@ -2,7 +2,7 @@ import { homedir } from 'node:os'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { parseCliId } from './cli/index.js'
-import type { AgentRecord, AppState, CliId, WorkspaceRecord } from './types.js'
+import type { AgentRecord, AppSettings, AppState, CliId, SkyChoice, WorkspaceRecord } from './types.js'
 
 const STATE_PATH = join(homedir(), '.atoll', 'state.json')
 const LEGACY_STATE_PATH = join(homedir(), '.cursor-isles', 'state.json')
@@ -74,7 +74,7 @@ export async function loadState() {
     if (raw === null) throw new Error('missing')
     const parsed = JSON.parse(raw) as AppState
     state = {
-      settings: { cli: parseCliId(parsed.settings?.cli) },
+      settings: readSettings(parsed.settings),
       workspaces: (parsed.workspaces ?? []).map((ws) => ({
         ...ws,
         agents: (ws.agents ?? []).map((agent) => ({
@@ -108,15 +108,46 @@ export function expandHome(path: string) {
   return path
 }
 
-export function getSettings() {
-  return { cli: parseCliId(state.settings?.cli) }
+export function parseSkyChoice(value: unknown): SkyChoice {
+  if (
+    value === 'auto'
+    || value === 'sunrise'
+    || value === 'day'
+    || value === 'sunset'
+    || value === 'night'
+  ) {
+    return value
+  }
+  return 'auto'
 }
 
-export async function setCli(cli: CliId) {
-  state = { ...state, settings: { cli } }
+function readSettings(settings: AppSettings | undefined): AppSettings {
+  return {
+    cli: parseCliId(settings?.cli),
+    sky: parseSkyChoice(settings?.sky),
+  }
+}
+
+export function getSettings() {
+  return readSettings(state.settings)
+}
+
+export async function updateSettings(patch: Partial<AppSettings>) {
+  const current = getSettings()
+  state = {
+    ...state,
+    settings: {
+      cli: patch.cli ?? current.cli,
+      sky: patch.sky ?? current.sky,
+    },
+  }
   await persistNow()
   notify()
   return getSettings()
+}
+
+export async function setCli(cli: CliId) {
+  return updateSettings({ cli })
 }
 
 export async function listWorkspaces() {

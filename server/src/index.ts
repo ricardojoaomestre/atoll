@@ -13,8 +13,9 @@ import {
   getWorkspace,
   listWorkspaces,
   loadState,
+  parseSkyChoice,
   removeAgent,
-  setCli,
+  updateSettings,
 } from './store.js'
 import { listCliChoices, parseCliId } from './cli/index.js'
 import { ptyManager } from './pty-manager.js'
@@ -57,12 +58,30 @@ async function main() {
     options: listCliChoices(),
   }))
 
-  app.put<{ Body: { cli?: unknown } }>('/api/settings', async (req, reply) => {
+  app.put<{ Body: { cli?: unknown; sky?: unknown } }>('/api/settings', async (req, reply) => {
     const cli = req.body?.cli
-    if (cli !== 'cursor' && cli !== 'claude') {
+    const sky = req.body?.sky
+    if (cli !== undefined && cli !== 'cursor' && cli !== 'claude') {
       return reply.code(400).send({ error: 'cli must be cursor or claude' })
     }
-    return { ...await setCli(parseCliId(cli)), options: listCliChoices() }
+    if (
+      sky !== undefined
+      && sky !== 'auto'
+      && sky !== 'sunrise'
+      && sky !== 'day'
+      && sky !== 'sunset'
+      && sky !== 'night'
+    ) {
+      return reply.code(400).send({ error: 'sky must be auto, sunrise, day, sunset, or night' })
+    }
+    if (cli === undefined && sky === undefined) {
+      return reply.code(400).send({ error: 'cli or sky is required' })
+    }
+    const saved = await updateSettings({
+      cli: cli === undefined ? undefined : parseCliId(cli),
+      sky: sky === undefined ? undefined : parseSkyChoice(sky),
+    })
+    return { ...saved, options: listCliChoices() }
   })
 
   app.post('/api/pick-folder', async (_req, reply) => {

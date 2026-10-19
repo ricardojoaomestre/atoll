@@ -71,13 +71,13 @@ export function WorkspaceCard({ workspace }: WorkspaceCardProps) {
         className="transition-transform duration-75 ease-out group-hover:-translate-y-1"
       />
       <div className="mt-3 w-64 text-center">
-        <div className="font-display text-[10px] text-foreground group-hover:text-primary">
+        <div className="on-sky font-display text-[10px] text-foreground group-hover:text-primary">
           {workspace.name}
         </div>
         <div
           ref={pathLabel.ref}
           title={workspace.path}
-          className="mt-1 w-full overflow-hidden font-mono text-lg text-muted-foreground"
+          className="on-sky mt-1 w-full overflow-hidden font-mono text-lg text-muted-foreground"
         >
           {pathLabel.label}
         </div>

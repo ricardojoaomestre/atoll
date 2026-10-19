@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react'
 import { getSettings, updateSettings, type CliChoice } from '../lib/api'
+import { parseSkyChoice, setSkyChoice, type SkyChoice } from '../lib/time-of-day'
 import type { CliId } from '../types'
+
+const skies: { id: SkyChoice; label: string; detail: string }[] = [
+  { id: 'auto', label: 'AUTOMATIC', detail: 'Follows the time of day' },
+  { id: 'sunrise', label: 'SUNRISE', detail: 'Indigo fading into amber' },
+  { id: 'day', label: 'SUNNY DAY', detail: 'Deep blue fading into sky' },
+  { id: 'sunset', label: 'SUNSET', detail: 'Purple fading into orange' },
+  { id: 'night', label: 'NIGHT', detail: 'Dark sky and stars' },
+]
 
 interface SettingsDialogProps {
   open: boolean
@@ -10,6 +19,7 @@ interface SettingsDialogProps {
 export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const [options, setOptions] = useState<CliChoice[]>([])
   const [cli, setCli] = useState<CliId>('cursor')
+  const [sky, setSky] = useState<SkyChoice>('auto')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -22,6 +32,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
         if (cancelled) return
         setOptions(settings.options)
         setCli(settings.cli)
+        setSky(parseSkyChoice(settings.sky))
       })
       .catch((err: unknown) => {
         if (cancelled) return
@@ -38,7 +49,8 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
     setBusy(true)
     setError(null)
     try {
-      await updateSettings(cli)
+      const saved = await updateSettings({ cli, sky })
+      setSkyChoice(parseSkyChoice(saved.sky))
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save settings')
@@ -56,11 +68,12 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
         role="dialog"
         aria-labelledby="settings-title"
         onClick={(e) => e.stopPropagation()}
-        className="pixel-box w-full max-w-md bg-card p-5 shadow-[6px_6px_0_var(--color-border)]"
+        className="pixel-box max-h-[90vh] w-full max-w-md overflow-y-auto bg-card p-5 shadow-[6px_6px_0_var(--color-border)]"
       >
         <h2 id="settings-title" className="font-display text-sm text-primary">
-          DEFAULT CLI
+          SETTINGS
         </h2>
+        <p className="mt-4 font-display text-[8px] text-primary">DEFAULT CLI</p>
         <p className="mt-2 font-mono text-xl text-muted-foreground">
           New agents start with this CLI. One already running keeps the CLI it
           started with.
@@ -88,6 +101,32 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                 </span>
                 <span className="mt-1 block font-mono text-lg opacity-80">
                   {option.available ? option.bin : 'not installed'}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        <p className="mt-5 font-display text-[8px] text-primary">BACKGROUND</p>
+        <div className="mt-3 flex flex-col gap-2" role="radiogroup" aria-label="Background">
+          {skies.map((option) => {
+            const selected = sky === option.id
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setSky(option.id)}
+                className={`pixel-box px-3 py-2 text-left ${
+                  selected
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-foreground'
+                }`}
+              >
+                <span className="font-display text-[8px]">{option.label}</span>
+                <span className="mt-1 block font-mono text-lg opacity-80">
+                  {option.detail}
                 </span>
               </button>
             )

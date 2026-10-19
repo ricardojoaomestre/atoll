@@ -167,9 +167,9 @@ export function WorkspacePage() {
 
   if (error && !workspace) {
     return (
-      <div className="p-10 font-display text-xs">
+      <div className="sky-note p-10 font-display text-xs">
         Island not found.{' '}
-        <Link to="/" className="text-primary">
+        <Link to="/" className="sky-title text-primary">
           Back
         </Link>
       </div>
@@ -178,7 +178,7 @@ export function WorkspacePage() {
 
   if (!workspace) {
     return (
-      <div className="p-10 font-mono text-2xl text-muted-foreground">
+      <div className="sky-note p-10 font-mono text-2xl text-muted-foreground">
         Loading island...
       </div>
     )
@@ -206,8 +206,8 @@ export function WorkspacePage() {
           ◀ MAP
         </Link>
         <div>
-          <h1 className="font-display text-lg text-primary">{workspace.name}</h1>
-          <p className="font-mono text-lg text-muted-foreground">{workspace.path}</p>
+          <h1 className="sky-title font-display text-lg text-primary">{workspace.name}</h1>
+          <p className="sky-note font-mono text-lg text-muted-foreground">{workspace.path}</p>
         </div>
         <div className="ml-auto flex gap-2 font-display text-[8px]">
           <span className="pixel-box bg-secondary px-2 py-1 text-secondary-foreground">
@@ -261,7 +261,7 @@ export function WorkspacePage() {
           >
             <div className="relative z-10 flex min-h-56 flex-wrap items-end justify-center gap-10 px-6 pb-0">
               {roots.length === 0 && (
-                <p className="pb-6 font-mono text-2xl text-muted-foreground">
+                <p className="sky-note pb-6 font-mono text-2xl text-muted-foreground">
                   An empty island... spawn your first agent!
                 </p>
               )}
