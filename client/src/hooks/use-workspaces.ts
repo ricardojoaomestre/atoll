@@ -40,6 +40,17 @@ export function useWorkspaces() {
             }),
           )
         }
+        if (msg.type === 'summary' && msg.agentId && msg.summary) {
+          const summary = msg.summary
+          setWorkspaces((prev) =>
+            prev.map((ws) => ({
+              ...ws,
+              agents: ws.agents.map((agent) =>
+                agent.id === msg.agentId ? { ...agent, summary } : agent,
+              ),
+            })),
+          )
+        }
         if (msg.type === 'status' && msg.status) {
           const status = msg.status
           setWorkspaces((prev) =>

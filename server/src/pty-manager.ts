@@ -3,6 +3,7 @@ import * as pty from 'node-pty-prebuilt-multiarch'
 import type { IPty } from 'node-pty-prebuilt-multiarch'
 import type { WebSocket } from 'ws'
 import { getCli } from './cli/index.js'
+import { consumeInput, shortTask } from './task-summary.js'
 import { addAgent, getSettings, getWorkspace, listWorkspaces, removeAgent, updateAgent } from './store.js'
 import type { AgentRecord, AgentStatus, CliId } from './types.js'
 
@@ -29,6 +30,8 @@ interface Session {
   taskTimer?: ReturnType<typeof setTimeout>
   replayChunks: string[]
   replayBytes: number
+  draft: string
+  summary?: string
 }
 
 function appendReplay(session: Session, data: string) {
@@ -131,6 +134,7 @@ class PtyManager extends EventEmitter {
       lastInputAt: 0,
       replayChunks: [],
       replayBytes: 0,
+      draft: '',
     }
 
     this.sessions.set(input.agentId, session)
@@ -198,6 +202,7 @@ class PtyManager extends EventEmitter {
         }
         if (parsed.type === 'input' && typeof parsed.data === 'string') {
           session.pty.write(parsed.data)
+          this.noteTaskInput(session, parsed.data)
           this.markListening(session)
           return
         }
@@ -205,6 +210,7 @@ class PtyManager extends EventEmitter {
         // plain text input
       }
       session.pty.write(text)
+      this.noteTaskInput(session, text)
       this.markListening(session)
     })
 
@@ -417,6 +423,16 @@ class PtyManager extends EventEmitter {
       clearTimeout(session.idleTimer)
       session.idleTimer = undefined
     }
+  }
+
+  private noteTaskInput(session: Session, data: string) {
+    const next = consumeInput(session.draft, data)
+    session.draft = next.draft
+    if (next.submitted === null) return
+    const summary = shortTask(next.submitted)
+    if (!summary || summary === session.summary) return
+    session.summary = summary
+    this.emit('summary', session.agentId, summary)
   }
 
   private setStatus(session: Session, status: AgentStatus) {

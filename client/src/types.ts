@@ -20,6 +20,7 @@ export interface Agent {
   cli?: CliId
   taskKey?: string
   status: AgentStatus
+  summary?: string
   x: number
   createdAt: string
 }

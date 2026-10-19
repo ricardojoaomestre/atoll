@@ -5,6 +5,7 @@ export type AgentEvent = {
   type: string
   agentId?: string
   status?: AgentStatus
+  summary?: string
   agent?: Agent
 }
 

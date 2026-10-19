@@ -27,6 +27,15 @@ import type { WorkspaceRecord } from './types.js'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.PORT ?? 8787)
 
+function withLiveSession(agent: WorkspaceRecord['agents'][number]) {
+  const session = ptyManager.getSession(agent.id)
+  return {
+    ...agent,
+    status: session?.status ?? agent.status,
+    summary: session?.summary,
+  }
+}
+
 async function presentWorkspace(workspace: WorkspaceRecord) {
   const [firstCommit, hasCamp] = await Promise.all([
     firstCommitAt(workspace.path),
@@ -36,10 +45,7 @@ async function presentWorkspace(workspace: WorkspaceRecord) {
     ...workspace,
     firstCommitAt: firstCommit,
     hasCamp,
-    agents: workspace.agents.map((agent) => ({
-      ...agent,
-      status: ptyManager.getSession(agent.id)?.status ?? agent.status,
-    })),
+    agents: workspace.agents.map((agent) => withLiveSession(agent)),
   }
 }
 
@@ -139,10 +145,7 @@ async function main() {
   }>('/api/workspaces/:id/agents', async (req, reply) => {
     const workspace = await getWorkspace(req.params.id)
     if (!workspace) return reply.code(404).send({ error: 'not found' })
-    return workspace.agents.map((agent) => ({
-      ...agent,
-      status: ptyManager.getSession(agent.id)?.status ?? agent.status,
-    }))
+    return workspace.agents.map((agent) => withLiveSession(agent))
   })
 
   app.post<{
@@ -249,15 +252,22 @@ async function main() {
         socket.send(JSON.stringify({ type: 'remove', agentId }))
       }
     }
+    const onSummary = (agentId: string, summary: string) => {
+      if (socket.readyState === socket.OPEN) {
+        socket.send(JSON.stringify({ type: 'summary', agentId, summary }))
+      }
+    }
     ptyManager.on('status', onStatus)
     ptyManager.on('exit', onExit)
     ptyManager.on('spawn', onSpawn)
     ptyManager.on('remove', onRemove)
+    ptyManager.on('summary', onSummary)
     socket.on('close', () => {
       ptyManager.off('status', onStatus)
       ptyManager.off('exit', onExit)
       ptyManager.off('spawn', onSpawn)
       ptyManager.off('remove', onRemove)
+      ptyManager.off('summary', onSummary)
     })
   })
 

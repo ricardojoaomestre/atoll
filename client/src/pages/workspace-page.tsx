@@ -308,12 +308,19 @@ export function WorkspacePage() {
         >
           <div className="relative flex w-full shrink-0 flex-col items-center justify-center sm:w-[28%] lg:w-[24%]">
             {focusedAgent && (
-              <div className="origin-center scale-[2.2] sm:scale-[2.6]">
-                <AgentSprite
-                  agent={focusedAgent}
-                  selected
-                  onClick={hideTerminal}
-                />
+              <div className="flex max-w-full flex-col items-center">
+                <div className="origin-center scale-[2.2] sm:scale-[2.6]">
+                  <AgentSprite
+                    agent={focusedAgent}
+                    selected
+                    onClick={hideTerminal}
+                  />
+                </div>
+                {focusedAgent.summary && (
+                  <p className="on-sky mt-24 line-clamp-2 max-w-[15rem] text-center font-mono text-2xl leading-tight text-foreground">
+                    {focusedAgent.summary}
+                  </p>
+                )}
               </div>
             )}
           </div>
