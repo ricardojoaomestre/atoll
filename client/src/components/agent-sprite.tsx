@@ -4,6 +4,7 @@ interface AgentSpriteProps {
   agent: Agent
   small?: boolean
   selected?: boolean
+  ghost?: boolean
   onClick?: () => void
 }
 
@@ -11,22 +12,32 @@ export function AgentSprite({
   agent,
   small,
   selected,
+  ghost,
   onClick,
 }: AgentSpriteProps) {
-  const fill = `oklch(0.72 0.17 ${agent.color})`
-  const shade = `oklch(0.45 0.14 ${agent.color})`
+  const fill = ghost
+    ? 'oklch(0.93 0.02 250)'
+    : `oklch(0.72 0.17 ${agent.color})`
+  const shade = ghost
+    ? 'oklch(0.78 0.015 250)'
+    : `oklch(0.45 0.14 ${agent.color})`
   const status = agent.status
   const asking = status === 'needs-question'
   const begging = status === 'needs-permission'
   const listening = status === 'listening'
   const sleeping = status === 'idle'
 
+  const Tag = ghost ? 'div' : 'button'
+
   return (
-    <button
-      type="button"
+    <Tag
+      type={ghost ? undefined : 'button'}
       data-agent-sprite
-      onClick={onClick}
-      className="group relative flex flex-col items-center focus:outline-none"
+      onClick={ghost ? undefined : onClick}
+      title={ghost ? 'Mirrored from the parent agent' : undefined}
+      className={`relative flex flex-col items-center focus:outline-none ${
+        ghost ? 'cursor-default opacity-75' : 'group'
+      }`}
       style={{
         transform: `scale(${small ? 0.7 : 1})`,
         transformOrigin: 'bottom',
@@ -93,14 +104,14 @@ export function AgentSprite({
           height="72"
           viewBox="0 0 16 18"
           shapeRendering="crispEdges"
-          className={selected ? 'drop-shadow-[0_0_6px_var(--color-primary)]' : ''}
+          className={selected && !ghost ? 'drop-shadow-[0_0_6px_var(--color-primary)]' : ''}
         >
           <rect
             x="7"
             y="0"
             width="2"
             height="2"
-            fill="var(--color-primary)"
+            fill={ghost ? fill : 'var(--color-primary)'}
           />
           <rect x="7.5" y="2" width="1" height="2" fill="var(--color-border)" />
           <rect
@@ -237,18 +248,22 @@ export function AgentSprite({
       </div>
 
       <div
-        className={`pixel-box mt-1 px-2 py-0.5 font-display text-[8px] group-hover:bg-primary group-hover:text-primary-foreground ${
-          asking || begging
-            ? 'bg-warning text-primary-foreground'
-            : listening
-              ? 'bg-primary text-primary-foreground'
-              : sleeping
-                ? 'bg-muted text-muted-foreground'
-                : 'bg-card text-card-foreground'
+        className={`pixel-box mt-1 px-2 py-0.5 font-display text-[8px] ${
+          ghost
+            ? 'bg-card/25 text-muted-foreground/80'
+            : `group-hover:bg-primary group-hover:text-primary-foreground ${
+                asking || begging
+                  ? 'bg-warning text-primary-foreground'
+                  : listening
+                    ? 'bg-primary text-primary-foreground'
+                    : sleeping
+                      ? 'bg-muted text-muted-foreground'
+                      : 'bg-card text-card-foreground'
+              }`
         }`}
       >
         {agent.name}
       </div>
-    </button>
+    </Tag>
   )
 }

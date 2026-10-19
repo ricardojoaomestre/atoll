@@ -8,6 +8,8 @@ export type AgentStatus =
 
 export type AgentSource = 'pty' | 'task'
 
+export type CliId = 'cursor' | 'claude'
+
 export interface AgentRecord {
   id: string
   workspaceId: string
@@ -15,6 +17,7 @@ export interface AgentRecord {
   color: number
   parentId?: string
   source?: AgentSource
+  cli?: CliId
   taskKey?: string
   status: AgentStatus
   x: number
@@ -30,6 +33,11 @@ export interface WorkspaceRecord {
   createdAt: string
 }
 
+export interface AppSettings {
+  cli: CliId
+}
+
 export interface AppState {
   workspaces: WorkspaceRecord[]
+  settings?: AppSettings
 }

@@ -9,6 +9,7 @@ import {
 import { subscribeAgentEvents } from '../lib/events'
 import { AgentSprite } from '../components/agent-sprite'
 import { AgentTerminal } from '../components/agent-terminal'
+import { SettingsDialog } from '../components/settings-dialog'
 import { Island } from '../components/island'
 import { countByStatus } from '../lib/status'
 import { treeCount } from '../lib/tree-count'
@@ -21,13 +22,13 @@ export function WorkspacePage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [openTerminalIds, setOpenTerminalIds] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const openAgent = useCallback((agent: Agent) => {
-    const terminalId =
-      agent.source === 'task' && agent.parentId ? agent.parentId : agent.id
+    if (agent.source === 'task') return
     setSelectedId(agent.id)
     setOpenTerminalIds((prev) =>
-      prev.includes(terminalId) ? prev : [...prev, terminalId],
+      prev.includes(agent.id) ? prev : [...prev, agent.id],
     )
   }, [])
 
@@ -90,6 +91,21 @@ export function WorkspacePage() {
               : prev,
           )
         }
+        if (msg.type === 'remove' && msg.agentId) {
+          const agentId = msg.agentId
+          setSelectedId((current) => (current === agentId ? null : current))
+          setOpenTerminalIds((openIds) => openIds.filter((openId) => openId !== agentId))
+          setWorkspace((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  agents: prev.agents.filter(
+                    (agent) => agent.id !== agentId && agent.parentId !== agentId,
+                  ),
+                }
+              : prev,
+          )
+        }
       },
     })
   }, [refresh])
@@ -133,7 +149,9 @@ export function WorkspacePage() {
         await dismissAgent(workspace.id, agent.id)
         setOpenTerminalIds((prev) => prev.filter((openId) => openId !== agent.id))
         setSelectedId((current) => {
-          if (current === agent.id) return null
+          if (current === agent.id) {
+            return agent.source === 'task' && agent.parentId ? agent.parentId : null
+          }
           const selected = workspace.agents.find((a) => a.id === current)
           return selected?.parentId === agent.id ? null : current
         })
@@ -210,6 +228,13 @@ export function WorkspacePage() {
         </div>
         <button
           type="button"
+          onClick={() => setSettingsOpen(true)}
+          className="pixel-btn bg-muted px-4 py-3"
+        >
+          SETTINGS
+        </button>
+        <button
+          type="button"
           disabled={busy || focused}
           onClick={() => void onSpawn()}
           className="pixel-btn bg-primary px-4 py-3 text-primary-foreground disabled:opacity-40"
@@ -249,15 +274,19 @@ export function WorkspacePage() {
                   />
                   {workspace.agents
                     .filter((a) => a.parentId === agent.id)
-                    .map((child) => (
-                      <AgentSprite
-                        key={child.id}
-                        small
-                        agent={child}
-                        selected={selectedId === child.id}
-                        onClick={() => openAgent(child)}
-                      />
-                    ))}
+                    .map((child) => {
+                      const mirrored = child.source === 'task'
+                      return (
+                        <AgentSprite
+                          key={child.id}
+                          small
+                          ghost={mirrored}
+                          agent={child}
+                          selected={selectedId === child.id}
+                          onClick={mirrored ? undefined : () => openAgent(child)}
+                        />
+                      )
+                    })}
                 </div>
               ))}
             </div>
@@ -295,27 +324,20 @@ export function WorkspacePage() {
                 (agent) =>
                   agent.source !== 'task' && openTerminalIds.includes(agent.id),
               )
-              .map((agent) => {
-                const viewingTaskChild = workspace.agents.some(
-                  (child) =>
-                    child.id === selectedId
-                    && child.source === 'task'
-                    && child.parentId === agent.id,
-                )
-                return (
-                  <AgentTerminal
-                    key={agent.id}
-                    agent={agent}
-                    visible={selectedId === agent.id || viewingTaskChild}
-                    onClose={hideTerminal}
-                    onSubAgent={onSub}
-                    onDismiss={onDismiss}
-                  />
-                )
-              })}
+              .map((agent) => (
+                <AgentTerminal
+                  key={agent.id}
+                  agent={agent}
+                  visible={selectedId === agent.id}
+                  onClose={hideTerminal}
+                  onSubAgent={onSub}
+                  onDismiss={onDismiss}
+                />
+              ))}
           </div>
         </section>
       </div>
+      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </main>
   )
 }

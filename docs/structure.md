@@ -35,8 +35,8 @@ cursor-isles/
         ├── store.ts      # ~/.cursor-isles/state.json
         ├── pty-manager.ts
         ├── permission-detect.ts
-        ├── task-detect.ts
-        ├── agent-bin.ts  # Resolve agent binary
+        ├── task-detect.ts   # Cursor TUI patterns, used by cli/cursor.ts
+        ├── cli/             # Per-CLI binary, args, and TUI mapping
         ├── types.ts
         └── node-pty-prebuilt-multiarch.d.ts
 ```

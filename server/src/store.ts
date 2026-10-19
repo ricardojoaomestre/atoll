@@ -1,7 +1,8 @@
 import { homedir } from 'node:os'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import type { AgentRecord, AppState, WorkspaceRecord } from './types.js'
+import { parseCliId } from './cli/index.js'
+import type { AgentRecord, AppState, CliId, WorkspaceRecord } from './types.js'
 
 const STATE_PATH = join(homedir(), '.cursor-isles', 'state.json')
 
@@ -56,10 +57,12 @@ export async function loadState() {
     const raw = await readFile(STATE_PATH, 'utf8')
     const parsed = JSON.parse(raw) as AppState
     state = {
+      settings: { cli: parseCliId(parsed.settings?.cli) },
       workspaces: (parsed.workspaces ?? []).map((ws) => ({
         ...ws,
         agents: (ws.agents ?? []).map((agent) => ({
           ...agent,
+          cli: agent.cli === 'claude' || agent.cli === 'cursor' ? agent.cli : undefined,
           status:
             agent.status === 'working'
             || agent.status === 'listening'
@@ -88,6 +91,17 @@ export function expandHome(path: string) {
   return path
 }
 
+export function getSettings() {
+  return { cli: parseCliId(state.settings?.cli) }
+}
+
+export async function setCli(cli: CliId) {
+  state = { ...state, settings: { cli } }
+  await persistNow()
+  notify()
+  return getSettings()
+}
+
 export async function listWorkspaces() {
   return state.workspaces
 }
@@ -105,7 +119,7 @@ export async function createWorkspace(name: string, path: string) {
     agents: [],
     createdAt: new Date().toISOString(),
   }
-  state = { workspaces: [...state.workspaces, workspace] }
+  state = { ...state, workspaces: [...state.workspaces, workspace] }
   await persistNow()
   notify()
   return workspace
@@ -115,6 +129,7 @@ export async function deleteWorkspace(workspaceId: string) {
   const existing = await getWorkspace(workspaceId)
   if (!existing) return null
   state = {
+    ...state,
     workspaces: state.workspaces.filter((ws) => ws.id !== workspaceId),
   }
   await persistNow()
@@ -129,6 +144,7 @@ export async function addAgent(
     parentId?: string
     color?: number
     source?: AgentRecord['source']
+    cli?: CliId
     taskKey?: string
   },
 ) {
@@ -148,6 +164,7 @@ export async function addAgent(
     color: input.color ?? Math.floor(Math.random() * 360),
     parentId: input.parentId,
     source: input.source ?? 'pty',
+    cli: input.cli ?? getSettings().cli,
     taskKey: input.taskKey,
     status: 'working',
     x: 10 + Math.random() * 75,
@@ -155,6 +172,7 @@ export async function addAgent(
   }
 
   state = {
+    ...state,
     workspaces: state.workspaces.map((ws) =>
       ws.id === workspaceId
         ? { ...ws, agents: [...ws.agents, agent] }
@@ -173,6 +191,7 @@ export async function updateAgent(
 ) {
   let updated: AgentRecord | null = null
   state = {
+    ...state,
     workspaces: state.workspaces.map((ws) => {
       if (ws.id !== workspaceId) return ws
       return {
@@ -201,6 +220,7 @@ export async function removeAgent(workspaceId: string, agentId: string) {
   if (!target) return null
 
   state = {
+    ...state,
     workspaces: state.workspaces.map((ws) => {
       if (ws.id !== workspaceId) return ws
       return {

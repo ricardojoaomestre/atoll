@@ -2,11 +2,9 @@ import { EventEmitter } from 'node:events'
 import * as pty from 'node-pty-prebuilt-multiarch'
 import type { IPty } from 'node-pty-prebuilt-multiarch'
 import type { WebSocket } from 'ws'
-import { resolveAgentBin } from './agent-bin.js'
-import { classifyPrompt } from './permission-detect.js'
-import { detectTaskChildren, looksLikeTaskChunk } from './task-detect.js'
-import { addAgent, getWorkspace, updateAgent } from './store.js'
-import type { AgentRecord, AgentStatus } from './types.js'
+import { getCli } from './cli/index.js'
+import { addAgent, getSettings, getWorkspace, listWorkspaces, removeAgent, updateAgent } from './store.js'
+import type { AgentRecord, AgentStatus, CliId } from './types.js'
 
 const WAIT_PROMPT_MS = 1_500
 const TASK_DONE_MS = 6_000
@@ -21,6 +19,7 @@ interface Session {
   agentId: string
   workspaceId: string
   workspacePath: string
+  cli: CliId
   pty: IPty
   sockets: Set<WebSocket>
   status: AgentStatus
@@ -81,6 +80,7 @@ class PtyManager extends EventEmitter {
     agentId: string
     workspaceId: string
     workspacePath: string
+    cli?: CliId
     cols?: number
     rows?: number
   }) {
@@ -88,7 +88,13 @@ class PtyManager extends EventEmitter {
       return this.sessions.get(input.agentId)!
     }
 
-    const bin = resolveAgentBin()
+    const cli = getCli(input.cli ?? getSettings().cli)
+    const bin = cli.resolveBin()
+    if (!bin) {
+      throw new Error(
+        `${cli.label} CLI was not found. Install it, or pick another CLI in settings.`,
+      )
+    }
     const cols = input.cols ?? 100
     const rows = input.rows ?? 30
 
@@ -96,10 +102,16 @@ class PtyManager extends EventEmitter {
     for (const [key, value] of Object.entries(process.env)) {
       if (typeof value === 'string') env[key] = value
     }
+    // The embedded xterm supports color. These CLIs draw the prompt caret as
+    // an inverse cell, which disappears when color is disabled.
+    delete env.NO_COLOR
+    if (env.FORCE_COLOR === '0' || env.FORCE_COLOR === 'false') delete env.FORCE_COLOR
+    if (env.COLOR === '0') delete env.COLOR
     env.TERM = 'xterm-256color'
     env.COLORTERM = 'truecolor'
+    env.FORCE_COLOR = '3'
 
-    const term = pty.spawn(bin, ['--workspace', input.workspacePath, '--trust'], {
+    const term = pty.spawn(bin, cli.args(input.workspacePath), {
       name: 'xterm-256color',
       cols,
       rows,
@@ -111,6 +123,7 @@ class PtyManager extends EventEmitter {
       agentId: input.agentId,
       workspaceId: input.workspaceId,
       workspacePath: input.workspacePath,
+      cli: cli.id,
       pty: term,
       sockets: new Set(),
       status: 'working',
@@ -137,7 +150,7 @@ class PtyManager extends EventEmitter {
         && Date.now() - session.lastInputAt < TYPING_HOLD_MS
       if (!typing) this.setStatus(session, 'working')
       this.armIdleTimer(session)
-      if (looksLikeTaskChunk(data)) this.scheduleTaskScan(session)
+      if (getCli(session.cli).looksLikeTaskChunk(data)) this.scheduleTaskScan(session)
     })
 
     term.onExit(({ exitCode }) => {
@@ -246,10 +259,15 @@ class PtyManager extends EventEmitter {
     const workspace = await getWorkspace(session.workspaceId)
     if (!workspace) return
 
-    const detected = detectTaskChildren(recentReplay(session))
+    const detected = getCli(session.cli).detectTaskChildren(recentReplay(session))
     const existing = workspace.agents.filter(
       (agent) => agent.parentId === session.agentId && agent.source === 'task',
     )
+
+    if (session.status === 'done' || session.status === 'idle') {
+      await this.finishTaskChildren(session.workspaceId, session.agentId, existing)
+      return
+    }
 
     for (const item of detected) {
       let child = existing.find((agent) => agent.taskKey === item.key)
@@ -261,6 +279,10 @@ class PtyManager extends EventEmitter {
         )
         if (child) existing.push(child)
       }
+      if (item.done) {
+        if (child) await this.dropTaskChild(session.workspaceId, child, existing)
+        continue
+      }
       if (!child) {
         if (existing.length >= TASK_CHILD_CAP) continue
         const parentColor =
@@ -270,6 +292,7 @@ class PtyManager extends EventEmitter {
           parentId: session.agentId,
           color: (parentColor + 28) % 360,
           source: 'task',
+          cli: session.cli,
           taskKey: item.key,
         })
         if (!created) continue
@@ -277,16 +300,11 @@ class PtyManager extends EventEmitter {
         existing.push(created)
         this.emit('spawn', created)
       }
-      const status: AgentStatus = item.done ? 'done' : 'working'
-      if (child.status !== status) {
-        await updateAgent(session.workspaceId, child.id, { status })
-        this.emit('status', child.id, status)
-        child.status = status
+      if (child.status !== 'working') {
+        await updateAgent(session.workspaceId, child.id, { status: 'working' })
+        this.emit('status', child.id, 'working')
+        child.status = 'working'
       }
-    }
-
-    if (session.status === 'done' || session.status === 'idle') {
-      await this.finishTaskChildren(session.workspaceId, session.agentId, existing)
     }
   }
 
@@ -303,11 +321,41 @@ class PtyManager extends EventEmitter {
       )
       ?? []
     for (const child of children) {
-      if (child.status === 'working') {
-        await updateAgent(workspaceId, child.id, { status: 'done' })
-        this.emit('status', child.id, 'done')
+      await this.dropTaskChild(workspaceId, child)
+    }
+  }
+
+  async retireSettledTaskChildren() {
+    const workspaces = await listWorkspaces()
+    for (const workspace of workspaces) {
+      const settledParents = new Set(
+        workspace.agents
+          .filter((agent) => agent.status === 'done' || agent.status === 'idle')
+          .map((agent) => agent.id),
+      )
+      const present = new Set(workspace.agents.map((agent) => agent.id))
+      for (const agent of workspace.agents) {
+        if (agent.source !== 'task') continue
+        const parentMissing = !agent.parentId || !present.has(agent.parentId)
+        const parentSettled = Boolean(agent.parentId && settledParents.has(agent.parentId))
+        const taskSettled = agent.status === 'done' || agent.status === 'idle'
+        if (parentMissing || parentSettled || taskSettled) {
+          await this.dropTaskChild(workspace.id, agent)
+        }
       }
     }
+  }
+
+  private async dropTaskChild(
+    workspaceId: string,
+    child: AgentRecord,
+    known?: AgentRecord[],
+  ) {
+    const removed = await removeAgent(workspaceId, child.id)
+    if (!removed) return
+    const index = known?.findIndex((agent) => agent.id === child.id) ?? -1
+    if (known && index >= 0) known.splice(index, 1)
+    this.emit('remove', child.id)
   }
 
   private markListening(session: Session) {
@@ -333,7 +381,7 @@ class PtyManager extends EventEmitter {
 
   private idleDelay(session: Session) {
     if (session.status === 'working') {
-      const kind = classifyPrompt(recentReplay(session))
+      const kind = getCli(session.cli).classifyPrompt(recentReplay(session))
       return kind ? WAIT_PROMPT_MS : TASK_DONE_MS
     }
     if (session.status === 'done' || session.status === 'listening') {
@@ -344,7 +392,7 @@ class PtyManager extends EventEmitter {
 
   private onIdle(session: Session) {
     if (session.status === 'working') {
-      const kind = classifyPrompt(recentReplay(session))
+      const kind = getCli(session.cli).classifyPrompt(recentReplay(session))
       if (kind === 'permission') {
         this.setStatus(session, 'needs-permission')
         return

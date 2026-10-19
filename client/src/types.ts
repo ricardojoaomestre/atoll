@@ -8,6 +8,8 @@ export type AgentStatus =
 
 export type AgentSource = 'pty' | 'task'
 
+export type CliId = 'cursor' | 'claude'
+
 export interface Agent {
   id: string
   workspaceId: string
@@ -15,6 +17,7 @@ export interface Agent {
   color: number
   parentId?: string
   source?: AgentSource
+  cli?: CliId
   taskKey?: string
   status: AgentStatus
   x: number

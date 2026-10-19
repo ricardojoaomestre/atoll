@@ -61,6 +61,17 @@ export function useWorkspaces() {
             })),
           )
         }
+        if (msg.type === 'remove' && msg.agentId) {
+          const agentId = msg.agentId
+          setWorkspaces((prev) =>
+            prev.map((ws) => ({
+              ...ws,
+              agents: ws.agents.filter(
+                (agent) => agent.id !== agentId && agent.parentId !== agentId,
+              ),
+            })),
+          )
+        }
       },
     })
   }, [refresh])

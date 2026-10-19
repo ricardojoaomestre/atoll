@@ -1,4 +1,17 @@
-import type { Agent, Workspace } from '../types'
+import type { Agent, CliId, Workspace } from '../types'
+
+export interface CliChoice {
+  id: CliId
+  label: string
+  command: string
+  available: boolean
+  bin: string | null
+}
+
+export interface Settings {
+  cli: CliId
+  options: CliChoice[]
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers)
@@ -19,6 +32,17 @@ export function listWorkspaces() {
 
 export function getWorkspace(id: string) {
   return request<Workspace>(`/api/workspaces/${id}`)
+}
+
+export function getSettings() {
+  return request<Settings>('/api/settings')
+}
+
+export function updateSettings(cli: CliId) {
+  return request<Settings>('/api/settings', {
+    method: 'PUT',
+    body: JSON.stringify({ cli }),
+  })
 }
 
 export function pickFolder() {

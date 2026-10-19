@@ -9,11 +9,14 @@ import {
   deleteWorkspace,
   expandHome,
   getAgent,
+  getSettings,
   getWorkspace,
   listWorkspaces,
   loadState,
   removeAgent,
+  setCli,
 } from './store.js'
+import { listCliChoices, parseCliId } from './cli/index.js'
 import { ptyManager } from './pty-manager.js'
 import { firstCommitAt } from './first-commit.js'
 import { hasPushedToOrigin } from './origin.js'
@@ -41,12 +44,26 @@ async function presentWorkspace(workspace: WorkspaceRecord) {
 
 async function main() {
   await loadState()
+  await ptyManager.retireSettledTaskChildren()
 
   const app = Fastify({ logger: { level: 'warn' } })
   await app.register(cors, { origin: true })
   await app.register(websocket)
 
   app.get('/api/health', async () => ({ ok: true }))
+
+  app.get('/api/settings', async () => ({
+    ...getSettings(),
+    options: listCliChoices(),
+  }))
+
+  app.put<{ Body: { cli?: unknown } }>('/api/settings', async (req, reply) => {
+    const cli = req.body?.cli
+    if (cli !== 'cursor' && cli !== 'claude') {
+      return reply.code(400).send({ error: 'cli must be cursor or claude' })
+    }
+    return { ...await setCli(parseCliId(cli)), options: listCliChoices() }
+  })
 
   app.post('/api/pick-folder', async (_req, reply) => {
     try {
@@ -124,6 +141,7 @@ async function main() {
         agentId: agent.id,
         workspaceId: workspace.id,
         workspacePath: workspace.path,
+        cli: agent.cli,
       })
     } catch (err) {
       await removeAgent(workspace.id, agent.id)
@@ -151,6 +169,7 @@ async function main() {
       name: req.body?.name,
       parentId: parent.id,
       source: 'pty',
+      cli: parent.cli ?? getSettings().cli,
     })
     if (!agent) return reply.code(500).send({ error: 'failed to create agent' })
 
@@ -159,6 +178,7 @@ async function main() {
         agentId: agent.id,
         workspaceId: workspace.id,
         workspacePath: workspace.path,
+        cli: agent.cli,
       })
     } catch (err) {
       await removeAgent(workspace.id, agent.id)
@@ -205,13 +225,20 @@ async function main() {
         socket.send(JSON.stringify({ type: 'spawn', agent }))
       }
     }
+    const onRemove = (agentId: string) => {
+      if (socket.readyState === socket.OPEN) {
+        socket.send(JSON.stringify({ type: 'remove', agentId }))
+      }
+    }
     ptyManager.on('status', onStatus)
     ptyManager.on('exit', onExit)
     ptyManager.on('spawn', onSpawn)
+    ptyManager.on('remove', onRemove)
     socket.on('close', () => {
       ptyManager.off('status', onStatus)
       ptyManager.off('exit', onExit)
       ptyManager.off('spawn', onSpawn)
+      ptyManager.off('remove', onRemove)
     })
   })
 
@@ -236,6 +263,7 @@ async function main() {
           agentId: found.agent.id,
           workspaceId: found.workspace.id,
           workspacePath: found.workspace.path,
+          cli: found.agent.cli,
         })
       } catch (err) {
         socket.send(

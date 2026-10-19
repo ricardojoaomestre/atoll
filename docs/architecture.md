@@ -33,13 +33,14 @@ flowchart LR
 | POST | `/api/workspaces/:id/agents/:agentId/sub` | Real child PTY (`parentId`, `source: 'pty'`) |
 | DELETE | `/api/workspaces/:id/agents/:agentId` | Kill PTY + remove agent (+ children) |
 
-Spawn command (see `pty-manager.ts`):
+Spawn goes through `server/src/cli/`. The default is stored in `state.json` settings and chosen in the SETTINGS dialog. A running agent keeps the CLI it was started with.
 
-```bash
-agent --workspace <absolutePath> --trust
-```
+| CLI | Command | Binary |
+| --- | --- | --- |
+| `cursor` (default) | `agent --workspace <path> --trust` | `CURSOR_AGENT_BIN`, then `agent` |
+| `claude` | `claude` with `cwd` set to the workspace | `CLAUDE_BIN`, then `claude` |
 
-Binary resolution: `CURSOR_AGENT_BIN`, then `~/.local/bin/agent`, then `command -v agent`.
+Each adapter also owns the text patterns for permission prompts and mirrored task sprites. The PTY lifecycle and status machine are shared.
 
 ## WebSockets
 

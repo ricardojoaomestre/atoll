@@ -12,20 +12,21 @@ function isExecutable(path: string) {
   }
 }
 
-export function resolveAgentBin(): string {
-  if (process.env.CURSOR_AGENT_BIN && isExecutable(process.env.CURSOR_AGENT_BIN)) {
-    return process.env.CURSOR_AGENT_BIN
-  }
+export function resolveBin(options: { envVar: string; file: string }) {
+  const fromEnv = process.env[options.envVar]
+  if (fromEnv && isExecutable(fromEnv)) return fromEnv
 
-  const homeBin = join(homedir(), '.local', 'bin', 'agent')
-  if (isExecutable(homeBin)) return homeBin
-
-  for (const candidate of ['/usr/local/bin/agent', '/opt/homebrew/bin/agent']) {
+  const candidates = [
+    join(homedir(), '.local', 'bin', options.file),
+    join('/usr/local/bin', options.file),
+    join('/opt/homebrew/bin', options.file),
+  ]
+  for (const candidate of candidates) {
     if (isExecutable(candidate)) return candidate
   }
 
   try {
-    const fromPath = execSync('command -v agent', {
+    const fromPath = execSync(`command -v ${options.file}`, {
       encoding: 'utf8',
       env: process.env,
     }).trim()
@@ -34,5 +35,5 @@ export function resolveAgentBin(): string {
     // fall through
   }
 
-  return homeBin
+  return null
 }

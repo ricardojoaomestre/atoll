@@ -36,6 +36,8 @@ export function AgentTerminal({
 
     const term = new Terminal({
       cursorBlink: true,
+      cursorStyle: 'block',
+      cursorInactiveStyle: 'block',
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
       fontSize: 14,
       lineHeight: 1.2,
@@ -44,6 +46,7 @@ export function AgentTerminal({
         background: '#0c0a14',
         foreground: '#e8e2ff',
         cursor: '#f8d048',
+        cursorAccent: '#1a1020',
         selectionBackground: '#3dd6c655',
       },
       allowProposedApi: true,

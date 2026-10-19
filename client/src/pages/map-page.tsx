@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { createWorkspace, deleteWorkspace } from '../lib/api'
 import { useWorkspaces } from '../hooks/use-workspaces'
 import { NewWorkspaceDialog } from '../components/new-workspace-dialog'
+import { SettingsDialog } from '../components/settings-dialog'
 import { WorkspaceCard } from '../components/workspace-card'
 
 export function MapPage() {
   const { workspaces, loading, error, refresh } = useWorkspaces()
   const [open, setOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   return (
     <main className="relative min-h-screen overflow-hidden px-6 py-8">
@@ -28,13 +30,22 @@ export function MapPage() {
             <p className="mt-2 font-mono text-xl text-destructive">{error}</p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="pixel-btn bg-primary px-4 py-3 text-primary-foreground"
-        >
-          + NEW WORKSPACE
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            className="pixel-btn bg-muted px-4 py-3"
+          >
+            SETTINGS
+          </button>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="pixel-btn bg-primary px-4 py-3 text-primary-foreground"
+          >
+            + NEW WORKSPACE
+          </button>
+        </div>
       </header>
 
       <section className="relative mx-auto mt-20 flex max-w-5xl flex-wrap justify-center gap-14">
@@ -43,7 +54,7 @@ export function MapPage() {
             <p className="font-display text-xs text-primary">EMPTY SEAS</p>
             <p className="mt-3 font-mono text-2xl text-muted-foreground">
               No islands yet. Create a workspace pointing at a local folder,
-              then spawn Cursor agents on it.
+              then spawn agents on it.
             </p>
             <button
               type="button"
@@ -76,6 +87,7 @@ export function MapPage() {
         ))}
       </section>
 
+      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <NewWorkspaceDialog
         open={open}
         onClose={() => setOpen(false)}
