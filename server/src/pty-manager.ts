@@ -3,7 +3,8 @@ import * as pty from 'node-pty-prebuilt-multiarch'
 import type { IPty } from 'node-pty-prebuilt-multiarch'
 import type { WebSocket } from 'ws'
 import { getCli } from './cli/index.js'
-import { consumeInput, shortTask } from './task-summary.js'
+import { consumeInput, taskText } from './task-summary.js'
+import { requestTitle } from './task-title.js'
 import { addAgent, getSettings, getWorkspace, listWorkspaces, removeAgent, updateAgent } from './store.js'
 import type { AgentRecord, AgentStatus, CliId } from './types.js'
 
@@ -32,6 +33,7 @@ interface Session {
   replayBytes: number
   draft: string
   summary?: string
+  titleAbort?: AbortController
 }
 
 function appendReplay(session: Session, data: string) {
@@ -225,6 +227,7 @@ class PtyManager extends EventEmitter {
     const session = this.sessions.get(agentId)
     if (!session) return false
     this.clearIdleTimer(session)
+    session.titleAbort?.abort()
     if (session.taskTimer) {
       clearTimeout(session.taskTimer)
       session.taskTimer = undefined
@@ -429,10 +432,30 @@ class PtyManager extends EventEmitter {
     const next = consumeInput(session.draft, data)
     session.draft = next.draft
     if (next.submitted === null) return
-    const summary = shortTask(next.submitted)
-    if (!summary || summary === session.summary) return
-    session.summary = summary
-    this.emit('summary', session.agentId, summary)
+    const request = taskText(next.submitted)
+    if (!request) return
+    this.retitle(session, request)
+  }
+
+  private retitle(session: Session, request: string) {
+    session.titleAbort?.abort()
+    const abort = new AbortController()
+    session.titleAbort = abort
+    const bin = getCli(session.cli).resolveBin()
+    if (!bin) return
+    const currentTitle = session.summary
+    void requestTitle({
+      bin,
+      cli: session.cli,
+      request,
+      currentTitle,
+      signal: abort.signal,
+    }).then((title) => {
+      if (abort.signal.aborted || !title || title === session.summary) return
+      if (!this.sessions.has(session.agentId)) return
+      session.summary = title
+      this.emit('summary', session.agentId, title)
+    })
   }
 
   private setStatus(session: Session, status: AgentStatus) {

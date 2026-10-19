@@ -1,16 +1,13 @@
 const PLACEHOLDER =
   /^(?:plan, search, build anything|add a follow-up\b.*|run a command\b.*|tell the agent what to do\b.*|describe how to revise\b.*)$/i
 
-const MAX = 72
+const MAX_REQUEST = 1500
 
-export function shortTask(raw: string): string | null {
+export function taskText(raw: string): string | null {
   const text = raw.replace(/\s+/g, ' ').trim()
   if (text.length < 2 || PLACEHOLDER.test(text)) return null
   if (/^\/[a-z0-9-]+$/i.test(text)) return null
-  if (text.length <= MAX) return text
-  const cut = text.slice(0, MAX - 1)
-  const space = cut.lastIndexOf(' ')
-  return `${(space > 24 ? cut.slice(0, space) : cut).trimEnd()}…`
+  return text.length > MAX_REQUEST ? text.slice(0, MAX_REQUEST) : text
 }
 
 export function consumeInput(draft: string, data: string) {
