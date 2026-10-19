@@ -1,6 +1,21 @@
 import { useState, type FormEvent } from 'react'
 import { pickFolder } from '../lib/api'
 
+function folderName(folderPath: string) {
+  const trimmed = folderPath.trim().replace(/[/\\]+$/, '')
+  if (!trimmed || trimmed === '~' || trimmed === '.' || trimmed === '..') return ''
+  const base = trimmed.split(/[/\\]/).pop() ?? ''
+  if (!base || base === '.' || base === '..') return ''
+  return base
+}
+
+function defaultName(current: string, previousPath: string, nextPath: string) {
+  const trimmed = current.trim()
+  const previous = folderName(previousPath)
+  if (trimmed && trimmed !== previous) return current
+  return folderName(nextPath)
+}
+
 interface NewWorkspaceDialogProps {
   open: boolean
   onClose: () => void
@@ -23,7 +38,10 @@ export function NewWorkspaceDialog({
     setError(null)
     try {
       const { path: selected } = await pickFolder()
-      if (selected) setPath(selected)
+      if (selected) {
+        setName((current) => defaultName(current, path, selected))
+        setPath(selected)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not open folder picker')
     } finally {
@@ -64,19 +82,7 @@ export function NewWorkspaceDialog({
           Point an island at a local project folder.
         </p>
 
-        <label className="mt-5 block font-display text-[8px] text-muted-foreground">
-          NAME
-          <input
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="pixel-box mt-2 w-full bg-terminal px-3 py-2 font-mono text-2xl text-terminal-foreground outline-none"
-            placeholder="web-shop"
-            required
-          />
-        </label>
-
-        <div className="mt-4">
+        <div className="mt-5">
           <label
             htmlFor="workspace-path"
             className="block font-display text-[8px] text-muted-foreground"
@@ -86,8 +92,13 @@ export function NewWorkspaceDialog({
           <div className="mt-2 flex items-stretch gap-2">
             <input
               id="workspace-path"
+              autoFocus
               value={path}
-              onChange={(e) => setPath(e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value
+                setName((current) => defaultName(current, path, next))
+                setPath(next)
+              }}
               className="pixel-box min-w-0 flex-1 bg-terminal px-3 py-2 font-mono text-2xl text-terminal-foreground outline-none"
               placeholder="~/code/web-shop"
               required
@@ -102,6 +113,17 @@ export function NewWorkspaceDialog({
             </button>
           </div>
         </div>
+
+        <label className="mt-4 block font-display text-[8px] text-muted-foreground">
+          NAME
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="pixel-box mt-2 w-full bg-terminal px-3 py-2 font-mono text-2xl text-terminal-foreground outline-none"
+            placeholder="web-shop"
+            required
+          />
+        </label>
 
         {error && (
           <p className="mt-3 font-mono text-xl text-destructive">{error}</p>
