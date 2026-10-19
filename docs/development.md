@@ -35,8 +35,23 @@ npm run dev:client
 ## Typecheck
 
 ```bash
-cd server && npx tsc --noEmit
-cd client && npx tsc --noEmit
+npm run typecheck
+```
+
+## Tests
+
+App UI only (no PTY / terminal / CLI integration):
+
+```bash
+npm run test:unit    # Vitest in client/
+npm run test:e2e     # Playwright (starts Vite, mocks /api)
+npm test             # both
+```
+
+First-time Playwright setup locally:
+
+```bash
+npx playwright install chromium
 ```
 
 ## Build
