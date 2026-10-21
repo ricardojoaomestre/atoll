@@ -16,6 +16,7 @@ Atoll gives a visual “map → island → agent” UI for **local** agent CLI s
 ### Workspace (`/workspace/:id`)
 
 - **Overview mode**: all agents on a floating island; **+ SPAWN AGENT** starts a new PTY.
+- Hover or keyboard-focus a worker to read its current job in a dialogue at the bottom of the page. The box hides in focused mode.
 - **+ SUB-AGENT** (terminal footer) starts a **real sibling PTY** (`source: 'pty'`).
 - In-process CLI **Task** children appear as inferred sprites (`source: 'task'`, no PTY). Click opens the **parent** terminal and highlights the child.
 - **Focused mode** (agent selected): zoom transition — ~28% large sprite, ~72% terminal; full width, minimal side padding.

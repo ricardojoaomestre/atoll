@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   dismissAgent,
@@ -7,6 +7,7 @@ import {
   spawnSubAgent,
 } from '../lib/api'
 import { subscribeAgentEvents } from '../lib/events'
+import { AgentDialogue } from '../components/agent-dialogue'
 import { AgentSprite } from '../components/agent-sprite'
 import { AgentTerminal } from '../components/agent-terminal'
 import { SettingsDialog } from '../components/settings-dialog'
@@ -23,14 +24,43 @@ export function WorkspacePage() {
   const [openTerminalIds, setOpenTerminalIds] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const hoverTimer = useRef<number | undefined>(undefined)
+
+  const clearHoverTimer = useCallback(() => {
+    if (hoverTimer.current !== undefined) {
+      window.clearTimeout(hoverTimer.current)
+      hoverTimer.current = undefined
+    }
+  }, [])
+
+  const showHovered = useCallback(
+    (agentId: string) => {
+      clearHoverTimer()
+      setHoveredId(agentId)
+    },
+    [clearHoverTimer],
+  )
+
+  const scheduleHideHovered = useCallback(() => {
+    clearHoverTimer()
+    hoverTimer.current = window.setTimeout(() => {
+      hoverTimer.current = undefined
+      setHoveredId(null)
+    }, 120)
+  }, [clearHoverTimer])
+
+  useEffect(() => clearHoverTimer, [clearHoverTimer])
 
   const openAgent = useCallback((agent: Agent) => {
     if (agent.source === 'task') return
+    clearHoverTimer()
+    setHoveredId(null)
     setSelectedId(agent.id)
     setOpenTerminalIds((prev) =>
       prev.includes(agent.id) ? prev : [...prev, agent.id],
     )
-  }, [])
+  }, [clearHoverTimer])
 
   const hideTerminal = useCallback(() => {
     setSelectedId(null)
@@ -65,6 +95,19 @@ export function WorkspacePage() {
             if (prev.agents.some((a) => a.id === spawned.id)) return prev
             return { ...prev, agents: [...prev.agents, spawned] }
           })
+        }
+        if (msg.type === 'summary' && msg.agentId && msg.summary) {
+          const summary = msg.summary
+          setWorkspace((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  agents: prev.agents.map((a) =>
+                    a.id === msg.agentId ? { ...a, summary } : a,
+                  ),
+                }
+              : prev,
+          )
         }
         if (msg.type === 'status' && msg.status) {
           const status = msg.status
@@ -188,6 +231,9 @@ export function WorkspacePage() {
   const focused = selectedId !== null
   const focusedAgent =
     workspace.agents.find((a) => a.id === selectedId) ?? null
+  const hoveredAgent = focused
+    ? null
+    : workspace.agents.find((a) => a.id === hoveredId) ?? null
 
   return (
     <main
@@ -271,6 +317,10 @@ export function WorkspacePage() {
                     agent={agent}
                     selected={selectedId === agent.id}
                     onClick={() => openAgent(agent)}
+                    onMouseEnter={() => showHovered(agent.id)}
+                    onMouseLeave={scheduleHideHovered}
+                    onFocus={() => showHovered(agent.id)}
+                    onBlur={scheduleHideHovered}
                   />
                   {workspace.agents
                     .filter((a) => a.parentId === agent.id)
@@ -284,6 +334,10 @@ export function WorkspacePage() {
                           agent={child}
                           selected={selectedId === child.id}
                           onClick={mirrored ? undefined : () => openAgent(child)}
+                          onMouseEnter={() => showHovered(child.id)}
+                          onMouseLeave={scheduleHideHovered}
+                          onFocus={() => showHovered(child.id)}
+                          onBlur={scheduleHideHovered}
                         />
                       )
                     })}
@@ -344,6 +398,7 @@ export function WorkspacePage() {
           </div>
         </section>
       </div>
+      {hoveredAgent && <AgentDialogue agent={hoveredAgent} />}
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </main>
   )

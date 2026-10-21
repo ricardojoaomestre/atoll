@@ -26,6 +26,40 @@ describe('AgentSprite', () => {
     expect(onClick).toHaveBeenCalledOnce()
   })
 
+  it('reports keyboard focus and blur', async () => {
+    const user = userEvent.setup()
+    const onFocus = vi.fn()
+    const onBlur = vi.fn()
+    render(
+      <AgentSprite agent={makeAgent()} onFocus={onFocus} onBlur={onBlur} />,
+    )
+
+    await user.tab()
+    expect(onFocus).toHaveBeenCalledOnce()
+    await user.tab()
+    expect(onBlur).toHaveBeenCalledOnce()
+  })
+
+  it('reports hover enter and leave', async () => {
+    const user = userEvent.setup()
+    const onMouseEnter = vi.fn()
+    const onMouseLeave = vi.fn()
+    const { container } = render(
+      <AgentSprite
+        agent={makeAgent()}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+      />,
+    )
+    const sprite = container.querySelector('[data-agent-sprite]')
+    expect(sprite).toBeTruthy()
+
+    await user.hover(sprite!)
+    expect(onMouseEnter).toHaveBeenCalledOnce()
+    await user.unhover(sprite!)
+    expect(onMouseLeave).toHaveBeenCalledOnce()
+  })
+
   it('renders a non-interactive ghost sprite for mirrored tasks', () => {
     const { container } = render(
       <AgentSprite

@@ -16,10 +16,12 @@ atoll/
 │       ├── lib/
 │       │   ├── api.ts    # REST + wsUrl()
 │       │   ├── events.ts # /api/events subscribe + reconnect
+│       │   ├── job-line.ts # Hover dialogue copy from summary, task name, or status
 │       │   └── status.ts # Labels/classes for status chips
 │       ├── hooks/
 │       │   └── use-workspaces.ts  # Mount/reconnect refresh + /api/events
 │       ├── components/
+│       │   ├── agent-dialogue.tsx # Bottom job box on island hover
 │       │   ├── agent-sprite.tsx   # Pixel robot by status
 │       │   ├── agent-terminal.tsx # xterm + WS lifecycle
 │       │   ├── island.tsx

@@ -6,6 +6,10 @@ interface AgentSpriteProps {
   selected?: boolean
   ghost?: boolean
   onClick?: () => void
+  onMouseEnter?: () => void
+  onMouseLeave?: () => void
+  onFocus?: () => void
+  onBlur?: () => void
 }
 
 export function AgentSprite({
@@ -14,6 +18,10 @@ export function AgentSprite({
   selected,
   ghost,
   onClick,
+  onMouseEnter,
+  onMouseLeave,
+  onFocus,
+  onBlur,
 }: AgentSpriteProps) {
   const fill = ghost
     ? 'oklch(0.93 0.02 250)'
@@ -34,6 +42,10 @@ export function AgentSprite({
       type={ghost ? undefined : 'button'}
       data-agent-sprite
       onClick={ghost ? undefined : onClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onFocus={ghost ? undefined : onFocus}
+      onBlur={ghost ? undefined : onBlur}
       title={ghost ? 'Mirrored from the parent agent' : undefined}
       className={`relative flex flex-col items-center focus:outline-none ${
         ghost ? 'cursor-default opacity-75' : 'group'
