@@ -206,7 +206,34 @@ export function projectSnapshot(snapshot: HerdrSnapshot): ProjectedWorkspace[] {
   })
 }
 
-export function shellPane(
+const SHELL_NAMES = new Set(['zsh', 'bash', 'fish', 'sh', 'dash', 'ksh', '-zsh', '-bash', '-fish'])
+
+export function shellReady(info: {
+  shell_pid?: number | null
+  foreground_processes?: Array<{ pid: number; name: string }> | null
+}) {
+  if (!info.shell_pid) return false
+  const foreground = info.foreground_processes ?? []
+  if (foreground.length === 0) return true
+  return foreground.every(
+    (proc) => proc.pid === info.shell_pid || SHELL_NAMES.has(proc.name),
+  )
+}
+
+export function shellState(info: {
+  shell_pid?: number | null
+  foreground_processes?: Array<{ pid: number; name: string }> | null
+}): 'ready' | 'starting' | 'busy' {
+  if (shellReady(info)) return 'ready'
+  const foreground = info.foreground_processes ?? []
+  if (!info.shell_pid) return foreground.length > 0 ? 'busy' : 'starting'
+  const occupied = foreground.some(
+    (proc) => proc.pid !== info.shell_pid && !SHELL_NAMES.has(proc.name),
+  )
+  return occupied ? 'busy' : 'starting'
+}
+
+export function shellPanes(
   snapshot: HerdrSnapshot,
   workspaceId: string,
   activeTabId: string,
@@ -214,7 +241,18 @@ export function shellPane(
   const shells = snapshot.panes.filter(
     (pane) => pane.workspace_id === workspaceId && !pane.agent,
   )
-  return shells.find((pane) => pane.tab_id === activeTabId) ?? shells[0] ?? null
+  return [
+    ...shells.filter((pane) => pane.tab_id === activeTabId),
+    ...shells.filter((pane) => pane.tab_id !== activeTabId),
+  ]
+}
+
+export function shellPane(
+  snapshot: HerdrSnapshot,
+  workspaceId: string,
+  activeTabId: string,
+) {
+  return shellPanes(snapshot, workspaceId, activeTabId)[0] ?? null
 }
 
 export function splitTarget(snapshot: HerdrSnapshot, workspaceId: string, activeTabId: string) {

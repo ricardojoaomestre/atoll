@@ -4,7 +4,9 @@ import { diffShipLog, type ShipLogEntry } from './log.js'
 import {
   nextAgentName,
   projectSnapshot,
-  shellPane,
+  shellPanes,
+  shellReady,
+  shellState,
   splitTarget,
   type HerdrAgentInfo,
   type HerdrSnapshot,
@@ -62,6 +64,9 @@ const START_RETRY_CODES = new Set([
   'pane_not_ready',
   'not_ready',
 ])
+
+const SHELL_WAIT_MS = 12_000
+const START_WAIT_MS = 20_000
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -274,18 +279,23 @@ export class HerdrSession extends EventEmitter {
     return true
   }
 
-  async spawnAgent(workspaceId: string, kind: string): Promise<ProjectedAgent> {
+  async spawnAgent(workspaceId: string, kind: string, task: string): Promise<ProjectedAgent> {
     const snapshot = this.requireSnapshot()
     const workspace = snapshot.workspaces.find((item) => item.workspace_id === workspaceId)
     if (!workspace) throw new HerdrError('Island not found', 'not_found')
     const projected = this.get(workspaceId)
     const paneId = await this.claimShell(snapshot, workspace.workspace_id, workspace.active_tab_id, projected?.path)
+    const ready = await this.waitForShell(paneId)
     const used = (this.snapshot?.agents ?? [])
       .map((agent) => agent.name)
       .filter((name): name is string => Boolean(name))
     const name = nextAgentName(kind, used)
-    const started = await this.startAgent(name, kind, paneId)
-    await this.reload().catch(() => undefined)
+    const started = await this.startAgent(name, kind, paneId, ready)
+    try {
+      await this.handTask(started.agent.name || name, task)
+    } finally {
+      await this.reload().catch(() => undefined)
+    }
     return (
       this.agent(workspaceId, started.agent.pane_id) ?? {
         id: started.agent.pane_id,
@@ -310,8 +320,9 @@ export class HerdrSession extends EventEmitter {
     activeTabId: string,
     cwd: string | undefined,
   ) {
-    const existing = shellPane(snapshot, workspaceId, activeTabId)
-    if (existing) return existing.pane_id
+    for (const pane of shellPanes(snapshot, workspaceId, activeTabId)) {
+      if ((await this.inspectShell(pane.pane_id)) !== 'busy') return pane.pane_id
+    }
     const target = splitTarget(snapshot, workspaceId, activeTabId)
     if (!target) throw new HerdrError('This island has no pane to split', 'no_pane')
     const before = new Set(snapshot.panes.map((pane) => pane.pane_id))
@@ -332,9 +343,65 @@ export class HerdrSession extends EventEmitter {
     return added.pane_id
   }
 
-  private async startAgent(name: string, kind: string, paneId: string) {
+  private async inspectShell(paneId: string) {
+    try {
+      const result = await herdrCall<{
+        process_info: {
+          shell_pid?: number | null
+          foreground_processes?: Array<{ pid: number; name: string }> | null
+        }
+      }>('pane.process_info', { pane_id: paneId })
+      return shellState(result.process_info)
+    } catch {
+      return 'starting' as const
+    }
+  }
+
+  private async waitForShell(paneId: string) {
+    const deadline = Date.now() + SHELL_WAIT_MS
+    while (Date.now() < deadline) {
+      try {
+        const result = await herdrCall<{
+          process_info: {
+            shell_pid?: number | null
+            foreground_processes?: Array<{ pid: number; name: string }> | null
+          }
+        }>('pane.process_info', { pane_id: paneId })
+        if (shellReady(result.process_info)) return true
+      } catch {
+        // The split pane can appear before Herdr can describe its process.
+      }
+      await sleep(300)
+    }
+    return false
+  }
+
+  private async handTask(target: string, task: string) {
     let last: HerdrError | null = null
-    for (let attempt = 0; attempt < 4; attempt += 1) {
+    const deadline = Date.now() + 15_000
+    while (Date.now() < deadline) {
+      try {
+        await herdrCall('agent.prompt', { target, text: task })
+        return
+      } catch (err) {
+        if (!(err instanceof HerdrError)) throw err
+        last = err
+        const waiting =
+          err.code === 'agent_not_ready' ||
+          err.code === 'agent_prompt_stalled' ||
+          err.code === 'agent_not_found' ||
+          /not an active named agent/i.test(err.message)
+        if (!waiting) throw err
+        await sleep(400)
+      }
+    }
+    throw last ?? new HerdrError('The agent started, and the task did not land.', 'agent_not_ready')
+  }
+
+  private async startAgent(name: string, kind: string, paneId: string, shellWasReady: boolean) {
+    let last: HerdrError | null = null
+    const deadline = Date.now() + START_WAIT_MS
+    while (Date.now() < deadline) {
       try {
         return await herdrCall<AgentStarted>(
           'agent.start',
@@ -344,9 +411,16 @@ export class HerdrSession extends EventEmitter {
       } catch (err) {
         if (!(err instanceof HerdrError)) throw err
         last = err
-        if (!START_RETRY_CODES.has(err.code)) throw err
-        await sleep(400)
+        const waiting = START_RETRY_CODES.has(err.code) || /available shell/i.test(err.message)
+        if (!waiting) throw err
+        await sleep(500)
       }
+    }
+    if (!shellWasReady) {
+      throw new HerdrError(
+        'Herdr opened a shell, and it has not reached a prompt yet. Leave that pane alone and try again in a moment.',
+        'agent_not_ready',
+      )
     }
     throw last ?? new HerdrError('Herdr did not start the agent', 'agent_not_ready')
   }

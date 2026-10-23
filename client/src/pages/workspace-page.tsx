@@ -14,6 +14,7 @@ import { AgentSession } from '../components/agent-session'
 import { AgentSprite } from '../components/agent-sprite'
 import { Beach } from '../components/beach'
 import { SettingsDialog } from '../components/settings-dialog'
+import { SpawnAgentDialog } from '../components/spawn-agent-dialog'
 import { Island } from '../components/island'
 import { composerMode } from '../lib/composer'
 import { nextMate } from '../lib/chart'
@@ -32,6 +33,7 @@ export function WorkspacePage() {
   const [speechError, setSpeechError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [spawnOpen, setSpawnOpen] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [pinnedId, setPinnedId] = useState<string | null>(mate)
   const [focusSpeech, setFocusSpeech] = useState(Boolean(mate))
@@ -177,15 +179,13 @@ export function WorkspacePage() {
     })
   }, [refresh])
 
-  const onSpawn = useCallback(async () => {
+  const onSpawn = useCallback(async (task: string, kind: string) => {
     if (!workspace) return
     setBusy(true)
     try {
-      const agent = await spawnAgent(workspace.id)
+      const agent = await spawnAgent(workspace.id, task, kind)
       await refresh()
       openAgent(agent)
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Spawn failed')
     } finally {
       setBusy(false)
     }
@@ -380,7 +380,7 @@ export function WorkspacePage() {
         <button
           type="button"
           disabled={busy || focused}
-          onClick={() => void onSpawn()}
+          onClick={() => setSpawnOpen(true)}
           className="pixel-btn bg-primary px-4 py-3 text-primary-foreground disabled:opacity-40"
         >
           + SPAWN AGENT
@@ -482,7 +482,7 @@ export function WorkspacePage() {
                 busy={busy}
                 error={speechError}
                 onHide={hideTerminal}
-                onAnother={() => void onSpawn()}
+                onAnother={() => setSpawnOpen(true)}
                 onDismiss={() => void onDismiss(focusedAgent)}
                 onSpeak={(text) => void onSpeak(focusedAgent, text)}
               />
@@ -507,6 +507,11 @@ export function WorkspacePage() {
         />
       )}
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SpawnAgentDialog
+        open={spawnOpen}
+        onClose={() => setSpawnOpen(false)}
+        onSpawn={onSpawn}
+      />
     </main>
   )
 }

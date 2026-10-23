@@ -54,6 +54,15 @@ function herdrFailure(err: unknown, reply: { code: (status: number) => { send: (
   return reply.code(status).send({ error: message })
 }
 
+function taskFrom(value: unknown): { ok: true; text: string } | { ok: false; error: string } {
+  if (typeof value !== 'string' || !value.trim()) {
+    return { ok: false, error: 'Write the task first.' }
+  }
+  const text = readSpeech(value)
+  if (!text) return { ok: false, error: 'That task is too long.' }
+  return { ok: true, text }
+}
+
 async function kindChoices(selected: string) {
   let kinds = FALLBACK_KINDS
   try {
@@ -185,15 +194,17 @@ async function main() {
 
   app.post<{
     Params: { id: string }
-    Body: { name?: string; kind?: string }
+    Body: { name?: string; kind?: string; task?: string }
   }>('/api/workspaces/:id/agents', async (req, reply) => {
     const requested = req.body?.kind ?? getSettings().cli
     const kind = parseAgentKind(requested)
     if (!KIND.test(kind)) {
       return reply.code(400).send({ error: 'kind must be a Herdr agent kind' })
     }
+    const task = taskFrom(req.body?.task)
+    if (!task.ok) return reply.code(400).send({ error: task.error })
     try {
-      return await herdrSession.spawnAgent(req.params.id, kind)
+      return await herdrSession.spawnAgent(req.params.id, kind, task.text)
     } catch (err) {
       return herdrFailure(err, reply)
     }
@@ -201,11 +212,13 @@ async function main() {
 
   app.post<{
     Params: { id: string; agentId: string }
-    Body: { name?: string; kind?: string }
+    Body: { name?: string; kind?: string; task?: string }
   }>('/api/workspaces/:id/agents/:agentId/sub', async (req, reply) => {
     const kind = parseAgentKind(req.body?.kind ?? getSettings().cli)
+    const task = taskFrom(req.body?.task)
+    if (!task.ok) return reply.code(400).send({ error: task.error })
     try {
-      return await herdrSession.spawnAgent(req.params.id, kind)
+      return await herdrSession.spawnAgent(req.params.id, kind, task.text)
     } catch (err) {
       return herdrFailure(err, reply)
     }

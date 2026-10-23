@@ -5,6 +5,8 @@ import {
   nextAgentName,
   projectSnapshot,
   shellPane,
+  shellReady,
+  shellState,
   type HerdrSnapshot,
 } from './project.js'
 
@@ -107,6 +109,45 @@ describe('projectSnapshot', () => {
     assert.equal(first.path, '/Users/dev/atoll')
     assert.equal(first.agents[0].summary, 'Refactor the map')
     assert.equal(first.agents[0].status, 'working')
+  })
+})
+
+describe('shellReady', () => {
+  it('accepts a pane whose foreground is the shell', () => {
+    assert.equal(shellReady({ shell_pid: 10, foreground_processes: [] }), true)
+    assert.equal(
+      shellReady({
+        shell_pid: 10,
+        foreground_processes: [{ pid: 10, name: 'zsh' }],
+      }),
+      true,
+    )
+    assert.equal(
+      shellReady({
+        shell_pid: 10,
+        foreground_processes: [{ pid: 44, name: 'claude' }],
+      }),
+      false,
+    )
+    assert.equal(shellReady({ shell_pid: null, foreground_processes: [] }), false)
+  })
+
+  it('treats a foreground command as busy', () => {
+    assert.equal(shellState({ shell_pid: null, foreground_processes: [] }), 'starting')
+    assert.equal(
+      shellState({
+        shell_pid: 10,
+        foreground_processes: [{ pid: 44, name: 'claude' }],
+      }),
+      'busy',
+    )
+    assert.equal(
+      shellState({
+        shell_pid: 10,
+        foreground_processes: [{ pid: 10, name: 'zsh' }],
+      }),
+      'ready',
+    )
   })
 })
 

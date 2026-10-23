@@ -93,8 +93,11 @@ Robot name is `display_agent`, then the agent kind (`cursor`). The hover line is
 
 Spawn on the island:
 
-1. If the workspace has a free shell pane, `agent start <name> --kind <kind> --pane <id>`.
-2. Otherwise `pane split`, then start in the new pane.
+1. Ask for the task.
+2. Prefer a shell pane that is idle or still starting. Skip one that already has a foreground command.
+3. Otherwise `pane split`, then wait until that pane's shell owns the foreground.
+4. `agent start <name> --kind <kind> --pane <id>`, retrying while Herdr says the pane is not an available shell.
+5. `agent.prompt` with the task once the agent is ready.
 
 `agent start` refuses a pane that is already running something. Dismiss closes that pane. Closing the last pane can close the workspace only from the map’s delete control. Release-back-to-shell is a different action and can wait.
 
@@ -124,7 +127,7 @@ On `events_lost`, drop the cache, resubscribe, and replace it from a fresh snaps
 
 `session.snapshot` plus workspace, tab, and pane events, including `pane.agent_status_changed` for each live pane. The browser refetches on `{ "type": "sync" }`.
 
-Spawn uses a free shell pane or `pane.split`, then `agent.start` with the kind from Settings. Click calls `agent.focus`. A note calls `agent.prompt` for idle or done. A reply to a blocked robot calls `pane.send_text`, then Enter. Dismiss calls `pane.close`. Deleting an island calls `workspace.close`.
+Spawn asks for a task, uses a free shell pane or `pane.split`, waits until that shell owns the foreground, then `agent.start` with the kind from Settings and `agent.prompt` for the task. Click calls `agent.focus`. A note calls `agent.prompt` for idle or done. A reply to a blocked robot calls `pane.send_text`, then Enter. Dismiss calls `pane.close`. Deleting an island calls `workspace.close`.
 
 The binary attach protocol is still the only way to put the real CLI back in the page, and it is the piece most likely to break across Herdr versions.
 
