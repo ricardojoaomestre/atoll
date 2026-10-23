@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
   answerAgent,
+  agentResult,
   dismissAgent,
   focusAgent,
   getWorkspace,
@@ -34,6 +35,8 @@ export function WorkspacePage() {
   const [busy, setBusy] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [spawnOpen, setSpawnOpen] = useState(false)
+  const [lastResult, setLastResult] = useState<string | null>(null)
+  const [resultPending, setResultPending] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [pinnedId, setPinnedId] = useState<string | null>(mate)
   const [focusSpeech, setFocusSpeech] = useState(Boolean(mate))
@@ -262,6 +265,27 @@ export function WorkspacePage() {
     return () => window.removeEventListener('keydown', onKey)
   }, [workspace, pinnedId, selectedId])
 
+  const selectedStatus = workspace?.agents.find((agent) => agent.id === selectedId)?.status
+  useEffect(() => {
+    if (!id || !selectedId) return
+    let cancelled = false
+    setLastResult(null)
+    setResultPending(true)
+    agentResult(id, selectedId)
+      .then((body) => {
+        if (!cancelled) setLastResult(body.text)
+      })
+      .catch(() => {
+        if (!cancelled) setLastResult(null)
+      })
+      .finally(() => {
+        if (!cancelled) setResultPending(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [id, selectedId, selectedStatus])
+
   if (error && !workspace) {
     const missing = error === 'not found'
     return (
@@ -481,6 +505,8 @@ export function WorkspacePage() {
                 agent={focusedAgent}
                 busy={busy}
                 error={speechError}
+                result={lastResult}
+                resultPending={resultPending}
                 onHide={hideTerminal}
                 onAnother={() => setSpawnOpen(true)}
                 onDismiss={() => void onDismiss(focusedAgent)}

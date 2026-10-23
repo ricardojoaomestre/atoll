@@ -1,3 +1,4 @@
+import { islandName } from './names.js'
 import type { AgentStatus } from '../types.js'
 
 export interface HerdrAgentInfo {
@@ -166,6 +167,7 @@ export function projectSnapshot(snapshot: HerdrSnapshot): ProjectedWorkspace[] {
         if (tabDelta !== 0) return tabDelta
         return a.pane_id.localeCompare(b.pane_id)
       })
+    const usedNames = new Set<string>()
     const panePaths = snapshot.panes
       .filter((pane) => pane.workspace_id === workspace.workspace_id)
       .map(cwdOf)
@@ -185,13 +187,14 @@ export function projectSnapshot(snapshot: HerdrSnapshot): ProjectedWorkspace[] {
       })),
       agents: agents.map((agent, index) => {
         const kind = agent.agent?.trim() || 'agent'
-        const named = agent.display_agent?.trim() || agent.name?.trim()
+        const name = islandName(agent.pane_id, usedNames)
+        usedNames.add(name)
         const cwd = cwdOf(agent) ?? undefined
         return {
           id: agent.pane_id,
           workspaceId: workspace.workspace_id,
-          name: named || kind,
-          color: hueFor(kind),
+          name,
+          color: hueFor(agent.pane_id),
           status: mapStatus(agent.agent_status),
           summary: summaryOf(agent),
           kind,

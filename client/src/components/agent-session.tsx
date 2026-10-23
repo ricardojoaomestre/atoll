@@ -8,6 +8,8 @@ interface AgentSessionProps {
   agent: Agent
   busy: boolean
   error: string | null
+  result: string | null
+  resultPending: boolean
   onHide: () => void
   onAnother: () => void
   onDismiss: () => void
@@ -18,6 +20,8 @@ export function AgentSession({
   agent,
   busy,
   error,
+  result,
+  resultPending,
   onHide,
   onAnother,
   onDismiss,
@@ -51,9 +55,14 @@ export function AgentSession({
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col justify-center gap-4 overflow-auto bg-terminal p-6">
-        <p className="font-mono text-3xl leading-tight text-terminal-foreground">
-          {jobLine(agent)}
-        </p>
+        <div>
+          <p className="font-display text-[8px] text-primary">LAST RESULT</p>
+          <p className="mt-2 font-mono text-3xl leading-tight text-terminal-foreground">
+            {resultPending
+              ? 'Reading the last result…'
+              : result || 'No finished result yet.'}
+          </p>
+        </div>
         <AgentComposer agent={agent} busy={busy} error={error} onSubmit={onSpeak} />
         <div className="font-mono text-2xl text-muted-foreground">
           {agent.kind && (
@@ -62,6 +71,10 @@ export function AgentSession({
               {agent.kind}
             </p>
           )}
+          <p className="mt-2">
+            <span className="font-display text-[8px] text-primary">JOB </span>
+            {jobLine(agent)}
+          </p>
           {agent.cwd && (
             <p className="mt-2 break-all">
               <span className="font-display text-[8px] text-primary">FOLDER </span>

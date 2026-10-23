@@ -89,7 +89,7 @@ The map lists every workspace from `session.snapshot`. `+ NEW WORKSPACE` calls `
 
 On the island, one robot per entry in `snapshot.agents` whose `workspace_id` matches. Shell panes stay off the sand. A second tab is a dock that filters the beach. The default dock shows every agent in the workspace, because the overview is “who is on this island”, and Herdr’s focused tab is only who has the keyboard.
 
-Robot name is `display_agent`, then the agent kind (`cursor`). The hover line is the metadata `summary` token when a reporter set one, otherwise `terminal_title_stripped`. The live title above is already a usable line.
+Robot name is one of thirty funny names, chosen from the pane id so the same robot keeps it. The kind stays on the card. The hover line is the metadata `summary` token when a reporter set one, otherwise `terminal_title_stripped`. The live title above is already a usable line.
 
 Spawn on the island:
 

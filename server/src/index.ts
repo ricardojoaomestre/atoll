@@ -224,6 +224,19 @@ async function main() {
     }
   })
 
+  app.get<{
+    Params: { id: string; agentId: string }
+  }>('/api/workspaces/:id/agents/:agentId/result', async (req, reply) => {
+    if (!herdrSession.connected()) return offline(reply)
+    try {
+      const text = await herdrSession.taskResult(req.params.id, req.params.agentId)
+      if (text === undefined) return reply.code(404).send({ error: 'not found' })
+      return { text }
+    } catch (err) {
+      return herdrFailure(err, reply)
+    }
+  })
+
   app.get('/api/log', async () => herdrSession.log())
 
   app.post<{

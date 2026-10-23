@@ -63,6 +63,12 @@ export function deleteWorkspace(id: string) {
   return request<{ ok: boolean }>(`/api/workspaces/${id}`, { method: 'DELETE' })
 }
 
+export function agentResult(workspaceId: string, agentId: string) {
+  return request<{ text: string | null }>(
+    `/api/workspaces/${workspaceId}/agents/${agentId}/result`,
+  )
+}
+
 export function spawnAgent(workspaceId: string, task: string, kind?: string) {
   return request<Agent>(`/api/workspaces/${workspaceId}/agents`, {
     method: 'POST',

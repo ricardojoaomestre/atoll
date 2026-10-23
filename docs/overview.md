@@ -26,7 +26,7 @@ Atoll gives a visual “map → island → agent” UI for the Herdr session alr
 
 ### Session card
 
-The focused card shows the kind, folder, dock, and job line, plus the same note or reply box. It does not embed the CLI. Herdr’s public socket reads panes as snapshots, and a snapshot is not a TUI.
+The focused card shows the funny name, the kind, folder, dock, the current job, and a short quote of the last finished reply. That quote comes from `agent.read` (`recent_unwrapped`), with the tool log and the prompt chrome left out. It does not embed the CLI.
 
 ### Live status
 

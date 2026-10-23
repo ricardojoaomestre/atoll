@@ -9,6 +9,7 @@ import {
   shellState,
   type HerdrSnapshot,
 } from './project.js'
+import { ISLAND_NAMES } from './names.js'
 
 const snapshot: HerdrSnapshot = {
   workspaces: [
@@ -95,12 +96,16 @@ describe('projectSnapshot', () => {
     assert.equal(second.path, '/repo')
     assert.deepEqual(second.tabs.map((tab) => tab.label), ['build', 'review'])
     assert.deepEqual(
-      second.agents.map((agent) => [agent.tabLabel, agent.name, agent.status, agent.kind]),
+      second.agents.map((agent) => [agent.tabLabel, agent.status, agent.kind]),
       [
-        ['build', 'writer', 'needs-question', 'claude'],
-        ['review', 'Reviewer', 'done', 'codex'],
+        ['build', 'needs-question', 'claude'],
+        ['review', 'done', 'codex'],
       ],
     )
+    assert.equal(new Set(second.agents.map((agent) => agent.name)).size, 2)
+    for (const agent of second.agents) {
+      assert.equal(ISLAND_NAMES.includes(agent.name), true)
+    }
     assert.equal(second.agents[1].summary, 'Read the diff')
     assert.equal(second.agents[1].cwd, '/repo/review')
 

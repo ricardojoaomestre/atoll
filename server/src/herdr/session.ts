@@ -13,6 +13,7 @@ import {
   type ProjectedAgent,
   type ProjectedWorkspace,
 } from './project.js'
+import { lastTaskResult } from './result.js'
 import { canAnswer, canTakeNote } from './speech.js'
 
 const LIFECYCLE = [
@@ -269,6 +270,18 @@ export class HerdrSession extends EventEmitter {
     if (!agent) return false
     await herdrCall('agent.focus', { target: paneId })
     return true
+  }
+
+  async taskResult(workspaceId: string, paneId: string) {
+    const agent = this.agent(workspaceId, paneId)
+    if (!agent) return undefined
+    const read = await herdrCall<{ read?: { text?: string | null } }>('agent.read', {
+      target: paneId,
+      source: 'recent_unwrapped',
+      lines: 1000,
+      strip_ansi: true,
+    })
+    return lastTaskResult(read.read?.text ?? '')
   }
 
   async dismissAgent(workspaceId: string, paneId: string) {
