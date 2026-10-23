@@ -5,6 +5,7 @@ export type AgentStatus =
   | 'needs-question'
   | 'needs-permission'
   | 'done'
+  | 'unknown'
 
 export type AgentSource = 'pty' | 'task'
 
@@ -36,7 +37,7 @@ export interface WorkspaceRecord {
 }
 
 export interface AppSettings {
-  cli: CliId
+  cli: string
   sky: SkyChoice
 }
 

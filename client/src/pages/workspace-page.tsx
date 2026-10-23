@@ -1,31 +1,42 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
+  answerAgent,
   dismissAgent,
+  focusAgent,
   getWorkspace,
+  promptAgent,
   spawnAgent,
-  spawnSubAgent,
 } from '../lib/api'
 import { subscribeAgentEvents } from '../lib/events'
 import { AgentDialogue } from '../components/agent-dialogue'
+import { AgentSession } from '../components/agent-session'
 import { AgentSprite } from '../components/agent-sprite'
-import { AgentTerminal } from '../components/agent-terminal'
+import { Beach } from '../components/beach'
 import { SettingsDialog } from '../components/settings-dialog'
 import { Island } from '../components/island'
+import { composerMode } from '../lib/composer'
+import { nextMate } from '../lib/chart'
 import { countByStatus } from '../lib/status'
 import { treeCount } from '../lib/tree-count'
 import type { Agent, Workspace } from '../types'
 
 export function WorkspacePage() {
   const { id } = useParams<{ id: string }>()
+  const [searchParams] = useSearchParams()
+  const mate = searchParams.get('mate')
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [openTerminalIds, setOpenTerminalIds] = useState<string[]>([])
+  const [notice, setNotice] = useState<string | null>(null)
+  const [speechError, setSpeechError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [pinnedId, setPinnedId] = useState<string | null>(mate)
+  const [focusSpeech, setFocusSpeech] = useState(Boolean(mate))
   const hoverTimer = useRef<number | undefined>(undefined)
+  const appliedMate = useRef<string | null>(null)
 
   const clearHoverTimer = useCallback(() => {
     if (hoverTimer.current !== undefined) {
@@ -38,8 +49,10 @@ export function WorkspacePage() {
     (agentId: string) => {
       clearHoverTimer()
       setHoveredId(agentId)
+      const agent = workspace?.agents.find((item) => item.id === agentId)
+      if (agent && composerMode(agent.status)) setPinnedId(agentId)
     },
-    [clearHoverTimer],
+    [clearHoverTimer, workspace],
   )
 
   const scheduleHideHovered = useCallback(() => {
@@ -56,10 +69,11 @@ export function WorkspacePage() {
     if (agent.source === 'task') return
     clearHoverTimer()
     setHoveredId(null)
+    setNotice(null)
     setSelectedId(agent.id)
-    setOpenTerminalIds((prev) =>
-      prev.includes(agent.id) ? prev : [...prev, agent.id],
-    )
+    void focusAgent(agent.workspaceId, agent.id).catch((err: unknown) => {
+      setNotice(err instanceof Error ? err.message : 'Could not focus that pane')
+    })
   }, [clearHoverTimer])
 
   const hideTerminal = useCallback(() => {
@@ -83,11 +97,22 @@ export function WorkspacePage() {
   }, [refresh])
 
   useEffect(() => {
+    if (!selectedId || !workspace) return
+    if (!workspace.agents.some((agent) => agent.id === selectedId)) {
+      setSelectedId(null)
+    }
+  }, [workspace, selectedId])
+
+  useEffect(() => {
     return subscribeAgentEvents({
       onReconnect: () => {
         void refresh()
       },
       onEvent: (msg) => {
+        if (msg.type === 'sync') {
+          void refresh()
+          return
+        }
         if (msg.type === 'spawn' && msg.agent) {
           const spawned = msg.agent
           setWorkspace((prev) => {
@@ -137,7 +162,6 @@ export function WorkspacePage() {
         if (msg.type === 'remove' && msg.agentId) {
           const agentId = msg.agentId
           setSelectedId((current) => (current === agentId ? null : current))
-          setOpenTerminalIds((openIds) => openIds.filter((openId) => openId !== agentId))
           setWorkspace((prev) =>
             prev
               ? {
@@ -167,37 +191,14 @@ export function WorkspacePage() {
     }
   }, [workspace, refresh, openAgent])
 
-  const onSub = useCallback(
-    async (parent: Agent) => {
-      if (!workspace) return
-      setBusy(true)
-      try {
-        const agent = await spawnSubAgent(workspace.id, parent.id)
-        await refresh()
-        openAgent(agent)
-      } catch (err) {
-        alert(err instanceof Error ? err.message : 'Sub-agent failed')
-      } finally {
-        setBusy(false)
-      }
-    },
-    [workspace, refresh, openAgent],
-  )
-
   const onDismiss = useCallback(
     async (agent: Agent) => {
       if (!workspace) return
+      if (!confirm(`Close the Herdr pane for ${agent.name}?`)) return
       setBusy(true)
       try {
         await dismissAgent(workspace.id, agent.id)
-        setOpenTerminalIds((prev) => prev.filter((openId) => openId !== agent.id))
-        setSelectedId((current) => {
-          if (current === agent.id) {
-            return agent.source === 'task' && agent.parentId ? agent.parentId : null
-          }
-          const selected = workspace.agents.find((a) => a.id === current)
-          return selected?.parentId === agent.id ? null : current
-        })
+        setSelectedId((current) => (current === agent.id ? null : current))
         await refresh()
       } catch (err) {
         alert(err instanceof Error ? err.message : 'Dismiss failed')
@@ -208,10 +209,64 @@ export function WorkspacePage() {
     [workspace, refresh],
   )
 
+  const onSpeak = useCallback(
+    async (agent: Agent, text: string) => {
+      if (!workspace) return
+      const mode = composerMode(agent.status)
+      if (!mode) return
+      setBusy(true)
+      setSpeechError(null)
+      try {
+        if (mode === 'note') await promptAgent(workspace.id, agent.id, text)
+        else await answerAgent(workspace.id, agent.id, text)
+        await refresh()
+      } catch (err) {
+        setSpeechError(err instanceof Error ? err.message : 'The sea swallowed that')
+      } finally {
+        setBusy(false)
+      }
+    },
+    [workspace, refresh],
+  )
+
+  useEffect(() => {
+    if (!mate || appliedMate.current === mate) return
+    if (!workspace?.agents.some((agent) => agent.id === mate)) return
+    appliedMate.current = mate
+    setPinnedId(mate)
+    setFocusSpeech(true)
+  }, [mate, workspace])
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setPinnedId(null)
+        setHoveredId(null)
+        setFocusSpeech(false)
+        return
+      }
+      if (event.key !== 'n' && event.key !== 'N') return
+      if (event.metaKey || event.ctrlKey || event.altKey || event.repeat) return
+      if (selectedId) return
+      const target = event.target
+      if (target instanceof HTMLElement && target.closest('input, textarea')) return
+      if (!workspace) return
+      const next = nextMate(workspace.agents, pinnedId)
+      if (!next) return
+      event.preventDefault()
+      setHoveredId(null)
+      setPinnedId(next)
+      setFocusSpeech(true)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [workspace, pinnedId, selectedId])
+
   if (error && !workspace) {
+    const missing = error === 'not found'
     return (
       <div className="sky-note p-10 font-display text-xs">
-        Island not found.{' '}
+        {missing ? 'Island not found.' : error}{' '}
         <Link to="/" className="sky-title text-primary">
           Back
         </Link>
@@ -227,13 +282,38 @@ export function WorkspacePage() {
     )
   }
 
-  const roots = workspace.agents.filter((a) => !a.parentId)
+  const docks = workspace.tabs ?? []
+  const showDocks = docks.length > 1
+  const groups = showDocks
+    ? docks.map((tab) => ({
+        id: tab.id,
+        label: tab.label,
+        agents: workspace.agents.filter(
+          (agent) => !agent.parentId && agent.tabId === tab.id,
+        ),
+      }))
+    : [
+        {
+          id: 'all',
+          label: '',
+          agents: workspace.agents.filter((agent) => !agent.parentId),
+        },
+      ]
+  const ungrouped = showDocks
+    ? workspace.agents.filter(
+        (agent) =>
+          !agent.parentId && !docks.some((tab) => tab.id === agent.tabId),
+      )
+    : []
+  if (ungrouped.length > 0) {
+    groups.push({ id: 'loose', label: 'other', agents: ungrouped })
+  }
   const focused = selectedId !== null
   const focusedAgent =
     workspace.agents.find((a) => a.id === selectedId) ?? null
-  const hoveredAgent = focused
+  const spokenAgent = focused
     ? null
-    : workspace.agents.find((a) => a.id === hoveredId) ?? null
+    : workspace.agents.find((agent) => agent.id === (hoveredId ?? pinnedId)) ?? null
 
   return (
     <main
@@ -253,23 +333,41 @@ export function WorkspacePage() {
         </Link>
         <div>
           <h1 className="sky-title font-display text-lg text-primary">{workspace.name}</h1>
-          <p className="sky-note font-mono text-lg text-muted-foreground">{workspace.path}</p>
+          <p className="sky-note font-mono text-lg text-muted-foreground">
+            {workspace.path || 'Herdr workspace'}
+          </p>
+          {notice && (
+            <p className="mt-1 font-mono text-xl text-destructive">{notice}</p>
+          )}
         </div>
-        <div className="ml-auto flex gap-2 font-display text-[8px]">
+        <div className="ml-auto flex flex-wrap gap-2 font-display text-[8px]">
           <span className="pixel-box bg-secondary px-2 py-1 text-secondary-foreground">
             ⚙ {countByStatus(workspace.agents, 'working')}
           </span>
-          <span className="pixel-box bg-primary px-2 py-1 text-primary-foreground">
-            ··· {countByStatus(workspace.agents, 'listening')}
-          </span>
-          <span className="pixel-box bg-warning px-2 py-1 text-primary-foreground">
-            ? {countByStatus(workspace.agents, 'needs-question')}
-          </span>
-          <span className="pixel-box bg-warning px-2 py-1 text-primary-foreground">
-            OK? {countByStatus(workspace.agents, 'needs-permission')}
-          </span>
+          {countByStatus(workspace.agents, 'needs-question') > 0 ? (
+            <button
+              type="button"
+              onClick={() => {
+                const next = nextMate(workspace.agents, pinnedId)
+                if (!next) return
+                setHoveredId(null)
+                setPinnedId(next)
+                setFocusSpeech(true)
+              }}
+              className="pixel-box bg-warning px-2 py-1 text-primary-foreground"
+            >
+              ? {countByStatus(workspace.agents, 'needs-question')}
+            </button>
+          ) : (
+            <span className="pixel-box bg-warning px-2 py-1 text-primary-foreground">
+              ? 0
+            </span>
+          )}
           <span className="pixel-box bg-success px-2 py-1 text-primary-foreground">
             ✓ {countByStatus(workspace.agents, 'done')}
+          </span>
+          <span className="pixel-box bg-muted px-2 py-1 text-muted-foreground">
+            z {countByStatus(workspace.agents, 'idle')}
           </span>
         </div>
         <button
@@ -298,58 +396,56 @@ export function WorkspacePage() {
           className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-500 ease-out ${
             focused
               ? 'pointer-events-none scale-150 opacity-0'
-              : 'scale-100 opacity-100'
+              : 'scale-100 overflow-y-auto pb-28 opacity-100'
           }`}
         >
           <div
             className="flex w-full flex-col animate-float"
             style={{ animationDuration: '6s' }}
           >
-            <div className="relative z-10 flex min-h-56 flex-wrap items-end justify-center gap-10 px-6 pb-0">
-              {roots.length === 0 && (
+            <div className="relative z-10 flex min-h-56 w-full flex-wrap items-end justify-center gap-16 px-6 pb-0">
+              {workspace.agents.length === 0 && (
                 <p className="sky-note pb-6 font-mono text-2xl text-muted-foreground">
                   An empty island... spawn your first agent!
                 </p>
               )}
-              {roots.map((agent) => (
-                <div key={agent.id} className="flex items-end gap-1">
-                  <AgentSprite
-                    agent={agent}
-                    selected={selectedId === agent.id}
-                    onClick={() => openAgent(agent)}
-                    onMouseEnter={() => showHovered(agent.id)}
-                    onMouseLeave={scheduleHideHovered}
-                    onFocus={() => showHovered(agent.id)}
-                    onBlur={scheduleHideHovered}
-                  />
-                  {workspace.agents
-                    .filter((a) => a.parentId === agent.id)
-                    .map((child) => {
-                      const mirrored = child.source === 'task'
-                      return (
-                        <AgentSprite
-                          key={child.id}
-                          small
-                          ghost={mirrored}
-                          agent={child}
-                          selected={selectedId === child.id}
-                          onClick={mirrored ? undefined : () => openAgent(child)}
-                          onMouseEnter={() => showHovered(child.id)}
-                          onMouseLeave={scheduleHideHovered}
-                          onFocus={() => showHovered(child.id)}
-                          onBlur={scheduleHideHovered}
-                        />
-                      )
-                    })}
+              {workspace.agents.length > 0 && groups.map((group) => (
+                <div key={group.id} className="flex w-full flex-col items-center gap-3">
+                  {showDocks && (
+                    <p className="font-display text-[8px] text-primary">
+                      DOCK {group.label}
+                    </p>
+                  )}
+                  {group.agents.length === 0 && showDocks ? (
+                    <span className="pb-4 font-mono text-2xl text-muted-foreground/50">
+                      ·
+                    </span>
+                  ) : (
+                    <Beach
+                      hue={workspace.hue}
+                      trees={treeCount(workspace.firstCommitAt)}
+                      camp={workspace.hasCamp}
+                      agents={group.agents}
+                      childrenOf={(agentId) =>
+                        workspace.agents.filter((child) => child.parentId === agentId)
+                      }
+                      selectedId={selectedId}
+                      onOpen={openAgent}
+                      onEnter={showHovered}
+                      onLeave={scheduleHideHovered}
+                    />
+                  )}
                 </div>
               ))}
             </div>
-            <Island
-              hue={workspace.hue}
-              wide
-              trees={treeCount(workspace.firstCommitAt)}
-              camp={workspace.hasCamp}
-            />
+            {workspace.agents.length === 0 && (
+              <Island
+                hue={workspace.hue}
+                wide
+                trees={treeCount(workspace.firstCommitAt)}
+                camp={workspace.hasCamp}
+              />
+            )}
           </div>
         </section>
 
@@ -380,25 +476,36 @@ export function WorkspacePage() {
           </div>
 
           <div className="relative min-h-[55vh] w-full min-w-0 flex-1 sm:min-h-0">
-            {workspace.agents
-              .filter(
-                (agent) =>
-                  agent.source !== 'task' && openTerminalIds.includes(agent.id),
-              )
-              .map((agent) => (
-                <AgentTerminal
-                  key={agent.id}
-                  agent={agent}
-                  visible={selectedId === agent.id}
-                  onClose={hideTerminal}
-                  onSubAgent={onSub}
-                  onDismiss={onDismiss}
-                />
-              ))}
+            {focusedAgent && (
+              <AgentSession
+                agent={focusedAgent}
+                busy={busy}
+                error={speechError}
+                onHide={hideTerminal}
+                onAnother={() => void onSpawn()}
+                onDismiss={() => void onDismiss(focusedAgent)}
+                onSpeak={(text) => void onSpeak(focusedAgent, text)}
+              />
+            )}
           </div>
         </section>
       </div>
-      {hoveredAgent && <AgentDialogue agent={hoveredAgent} />}
+      {spokenAgent && (
+        <AgentDialogue
+          agent={spokenAgent}
+          busy={busy}
+          error={speechError}
+          autoFocus={focusSpeech && hoveredId === null && spokenAgent.id === pinnedId}
+          onSubmit={(text) => void onSpeak(spokenAgent, text)}
+          onClose={() => {
+            setPinnedId(null)
+            setHoveredId(null)
+            setFocusSpeech(false)
+          }}
+          onPointerEnter={clearHoverTimer}
+          onPointerLeave={scheduleHideHovered}
+        />
+      )}
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </main>
   )

@@ -14,6 +14,7 @@ const statuses: AgentStatus[] = [
   'done',
   'needs-question',
   'needs-permission',
+  'unknown',
 ]
 
 describe('status labels and classes', () => {

@@ -3,72 +3,98 @@ import cors from '@fastify/cors'
 import websocket from '@fastify/websocket'
 import { access } from 'node:fs/promises'
 import { constants } from 'node:fs'
-import {
-  addAgent,
-  createWorkspace,
-  deleteWorkspace,
-  expandHome,
-  getAgent,
-  getSettings,
-  getWorkspace,
-  listWorkspaces,
-  loadState,
-  parseSkyChoice,
-  removeAgent,
-  updateSettings,
-} from './store.js'
-import { listCliChoices, parseCliId } from './cli/index.js'
-import { ptyManager } from './pty-manager.js'
+import { expandHome, getSettings, loadState, parseAgentKind, parseSkyChoice, updateSettings } from './store.js'
 import { firstCommitAt } from './first-commit.js'
 import { hasPushedToOrigin } from './origin.js'
 import { pickFolder } from './pick-folder.js'
-import type { WorkspaceRecord } from './types.js'
+import { readSpeech } from './herdr/speech.js'
+import { HerdrError } from './herdr/socket.js'
+import { herdrSession } from './herdr/session.js'
+import type { ProjectedWorkspace } from './herdr/project.js'
 
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.PORT ?? 8787)
+const KIND = /^[a-z][a-z0-9_-]{0,31}$/
+const FALLBACK_KINDS = ['claude', 'codex', 'cursor', 'gemini', 'opencode']
 
-function withLiveSession(agent: WorkspaceRecord['agents'][number]) {
-  const session = ptyManager.getSession(agent.id)
-  return {
-    ...agent,
-    status: session?.status ?? agent.status,
-    summary: session?.summary,
+const scenery = new Map<string, Promise<{ firstCommitAt: string | null; hasCamp: boolean }>>()
+
+function sceneryFor(path: string) {
+  if (!path) return Promise.resolve({ firstCommitAt: null, hasCamp: false })
+  let pending = scenery.get(path)
+  if (!pending) {
+    pending = Promise.all([firstCommitAt(path), hasPushedToOrigin(path)]).then(
+      ([firstCommitAtValue, hasCamp]) => ({
+        firstCommitAt: firstCommitAtValue,
+        hasCamp,
+      }),
+    )
+    scenery.set(path, pending)
   }
+  return pending
 }
 
-async function presentWorkspace(workspace: WorkspaceRecord) {
-  const [firstCommit, hasCamp] = await Promise.all([
-    firstCommitAt(workspace.path),
-    hasPushedToOrigin(workspace.path),
-  ])
-  return {
-    ...workspace,
-    firstCommitAt: firstCommit,
-    hasCamp,
-    agents: workspace.agents.map((agent) => withLiveSession(agent)),
+async function present(workspace: ProjectedWorkspace) {
+  const scene = await sceneryFor(workspace.path)
+  return { ...workspace, ...scene }
+}
+
+function offline(reply: { code: (status: number) => { send: (body: unknown) => unknown } }) {
+  return reply.code(503).send({
+    error: herdrSession.offlineError || 'Herdr is not running. Start it with herdr, then reload.',
+  })
+}
+
+function herdrFailure(err: unknown, reply: { code: (status: number) => { send: (body: unknown) => unknown } }) {
+  if (err instanceof HerdrError && (err.code === 'offline' || err.code === 'connect')) {
+    return offline(reply)
   }
+  const message = err instanceof Error ? err.message : 'Herdr request failed'
+  const status = err instanceof HerdrError && err.code === 'not_found' ? 404 : 400
+  return reply.code(status).send({ error: message })
+}
+
+async function kindChoices(selected: string) {
+  let kinds = FALLBACK_KINDS
+  try {
+    const reported = await herdrSession.kinds()
+    if (reported.length > 0) kinds = reported
+  } catch {
+    kinds = FALLBACK_KINDS
+  }
+  const options = [...new Set([selected, ...kinds])].sort((a, b) => a.localeCompare(b))
+  return options.map((id) => ({
+    id,
+    label: id.toUpperCase(),
+    command: `herdr · ${id}`,
+    available: kinds.includes(id),
+    bin: kinds.includes(id) ? 'herdr' : null,
+  }))
 }
 
 async function main() {
   await loadState()
-  await ptyManager.retireSettledTaskChildren()
+  await herdrSession.start()
 
   const app = Fastify({ logger: { level: 'warn' } })
   await app.register(cors, { origin: true })
   await app.register(websocket)
 
-  app.get('/api/health', async () => ({ ok: true }))
-
-  app.get('/api/settings', async () => ({
-    ...getSettings(),
-    options: listCliChoices(),
+  app.get('/api/health', async () => ({
+    ok: true,
+    herdr: herdrSession.connected(),
   }))
+
+  app.get('/api/settings', async () => {
+    const settings = getSettings()
+    return { ...settings, options: await kindChoices(settings.cli) }
+  })
 
   app.put<{ Body: { cli?: unknown; sky?: unknown } }>('/api/settings', async (req, reply) => {
     const cli = req.body?.cli
     const sky = req.body?.sky
-    if (cli !== undefined && cli !== 'cursor' && cli !== 'claude') {
-      return reply.code(400).send({ error: 'cli must be cursor or claude' })
+    if (cli !== undefined && (typeof cli !== 'string' || !KIND.test(cli))) {
+      return reply.code(400).send({ error: 'cli must be a Herdr agent kind' })
     }
     if (
       sky !== undefined
@@ -84,10 +110,10 @@ async function main() {
       return reply.code(400).send({ error: 'cli or sky is required' })
     }
     const saved = await updateSettings({
-      cli: cli === undefined ? undefined : parseCliId(cli),
+      cli: cli === undefined ? undefined : parseAgentKind(cli),
       sky: sky === undefined ? undefined : parseSkyChoice(sky),
     })
-    return { ...saved, options: listCliChoices() }
+    return { ...saved, options: await kindChoices(saved.cli) }
   })
 
   app.post('/api/pick-folder', async (_req, reply) => {
@@ -100,9 +126,9 @@ async function main() {
     }
   })
 
-  app.get('/api/workspaces', async () => {
-    const workspaces = await listWorkspaces()
-    return Promise.all(workspaces.map((ws) => presentWorkspace(ws)))
+  app.get('/api/workspaces', async (_req, reply) => {
+    if (!herdrSession.connected()) return offline(reply)
+    return Promise.all(herdrSession.list().map((workspace) => present(workspace)))
   })
 
   app.post<{
@@ -119,196 +145,138 @@ async function main() {
     } catch {
       return reply.code(400).send({ error: `path not readable: ${absolute}` })
     }
-    const workspace = await createWorkspace(name, absolute)
-    return presentWorkspace(workspace)
+    try {
+      const workspace = await herdrSession.createWorkspace(name, absolute)
+      return present(workspace)
+    } catch (err) {
+      return herdrFailure(err, reply)
+    }
   })
 
   app.delete<{
     Params: { id: string }
   }>('/api/workspaces/:id', async (req, reply) => {
-    ptyManager.killWorkspace(req.params.id)
-    const removed = await deleteWorkspace(req.params.id)
-    if (!removed) return reply.code(404).send({ error: 'not found' })
-    return { ok: true }
+    try {
+      const removed = await herdrSession.closeWorkspace(req.params.id)
+      if (!removed) return reply.code(404).send({ error: 'not found' })
+      return { ok: true }
+    } catch (err) {
+      return herdrFailure(err, reply)
+    }
   })
 
   app.get<{
     Params: { id: string }
   }>('/api/workspaces/:id', async (req, reply) => {
-    const workspace = await getWorkspace(req.params.id)
+    if (!herdrSession.connected()) return offline(reply)
+    const workspace = herdrSession.get(req.params.id)
     if (!workspace) return reply.code(404).send({ error: 'not found' })
-    return presentWorkspace(workspace)
+    return present(workspace)
   })
 
   app.get<{
     Params: { id: string }
   }>('/api/workspaces/:id/agents', async (req, reply) => {
-    const workspace = await getWorkspace(req.params.id)
+    if (!herdrSession.connected()) return offline(reply)
+    const workspace = herdrSession.get(req.params.id)
     if (!workspace) return reply.code(404).send({ error: 'not found' })
-    return workspace.agents.map((agent) => withLiveSession(agent))
+    return workspace.agents
   })
 
   app.post<{
     Params: { id: string }
-    Body: { name?: string }
+    Body: { name?: string; kind?: string }
   }>('/api/workspaces/:id/agents', async (req, reply) => {
-    const workspace = await getWorkspace(req.params.id)
-    if (!workspace) return reply.code(404).send({ error: 'not found' })
-
-    const agent = await addAgent(workspace.id, { name: req.body?.name })
-    if (!agent) return reply.code(500).send({ error: 'failed to create agent' })
-
-    try {
-      ptyManager.spawn({
-        agentId: agent.id,
-        workspaceId: workspace.id,
-        workspacePath: workspace.path,
-        cli: agent.cli,
-      })
-    } catch (err) {
-      await removeAgent(workspace.id, agent.id)
-      return reply.code(500).send({
-        error: err instanceof Error ? err.message : 'failed to spawn agent',
-      })
+    const requested = req.body?.kind ?? getSettings().cli
+    const kind = parseAgentKind(requested)
+    if (!KIND.test(kind)) {
+      return reply.code(400).send({ error: 'kind must be a Herdr agent kind' })
     }
-
-    return agent
+    try {
+      return await herdrSession.spawnAgent(req.params.id, kind)
+    } catch (err) {
+      return herdrFailure(err, reply)
+    }
   })
 
   app.post<{
     Params: { id: string; agentId: string }
-    Body: { name?: string }
+    Body: { name?: string; kind?: string }
   }>('/api/workspaces/:id/agents/:agentId/sub', async (req, reply) => {
-    const workspace = await getWorkspace(req.params.id)
-    if (!workspace) return reply.code(404).send({ error: 'not found' })
-    const parent = workspace.agents.find((a) => a.id === req.params.agentId)
-    if (!parent) return reply.code(404).send({ error: 'parent not found' })
-    if (parent.source === 'task') {
-      return reply.code(400).send({ error: 'task child has no pty' })
-    }
-
-    const agent = await addAgent(workspace.id, {
-      name: req.body?.name,
-      parentId: parent.id,
-      source: 'pty',
-      cli: parent.cli ?? getSettings().cli,
-    })
-    if (!agent) return reply.code(500).send({ error: 'failed to create agent' })
-
+    const kind = parseAgentKind(req.body?.kind ?? getSettings().cli)
     try {
-      ptyManager.spawn({
-        agentId: agent.id,
-        workspaceId: workspace.id,
-        workspacePath: workspace.path,
-        cli: agent.cli,
-      })
+      return await herdrSession.spawnAgent(req.params.id, kind)
     } catch (err) {
-      await removeAgent(workspace.id, agent.id)
-      return reply.code(500).send({
-        error: err instanceof Error ? err.message : 'failed to spawn agent',
-      })
+      return herdrFailure(err, reply)
     }
+  })
 
-    return agent
+  app.get('/api/log', async () => herdrSession.log())
+
+  app.post<{
+    Params: { id: string; agentId: string }
+    Body: { text?: unknown }
+  }>('/api/workspaces/:id/agents/:agentId/prompt', async (req, reply) => {
+    const text = readSpeech(req.body?.text)
+    if (!text) return reply.code(400).send({ error: 'Write something first.' })
+    try {
+      const sent = await herdrSession.promptAgent(req.params.id, req.params.agentId, text)
+      if (!sent) return reply.code(404).send({ error: 'not found' })
+      return { ok: true }
+    } catch (err) {
+      return herdrFailure(err, reply)
+    }
+  })
+
+  app.post<{
+    Params: { id: string; agentId: string }
+    Body: { text?: unknown }
+  }>('/api/workspaces/:id/agents/:agentId/answer', async (req, reply) => {
+    const text = readSpeech(req.body?.text)
+    if (!text) return reply.code(400).send({ error: 'Write something first.' })
+    try {
+      const sent = await herdrSession.answerAgent(req.params.id, req.params.agentId, text)
+      if (!sent) return reply.code(404).send({ error: 'not found' })
+      return { ok: true }
+    } catch (err) {
+      return herdrFailure(err, reply)
+    }
+  })
+
+  app.post<{
+    Params: { id: string; agentId: string }
+  }>('/api/workspaces/:id/agents/:agentId/focus', async (req, reply) => {
+    try {
+      const focused = await herdrSession.focusAgent(req.params.id, req.params.agentId)
+      if (!focused) return reply.code(404).send({ error: 'not found' })
+      return { ok: true }
+    } catch (err) {
+      return herdrFailure(err, reply)
+    }
   })
 
   app.delete<{
     Params: { id: string; agentId: string }
   }>('/api/workspaces/:id/agents/:agentId', async (req, reply) => {
-    const workspace = await getWorkspace(req.params.id)
-    if (!workspace) return reply.code(404).send({ error: 'not found' })
-
-    const children = workspace.agents.filter(
-      (a) => a.parentId === req.params.agentId,
-    )
-    for (const child of children) {
-      ptyManager.kill(child.id)
+    try {
+      const removed = await herdrSession.dismissAgent(req.params.id, req.params.agentId)
+      if (!removed) return reply.code(404).send({ error: 'not found' })
+      return { ok: true }
+    } catch (err) {
+      return herdrFailure(err, reply)
     }
-    ptyManager.kill(req.params.agentId)
-
-    const removed = await removeAgent(workspace.id, req.params.agentId)
-    if (!removed) return reply.code(404).send({ error: 'not found' })
-    return { ok: true }
   })
 
   app.get('/api/events', { websocket: true }, (socket) => {
-    const onStatus = (agentId: string, status: string) => {
+    const onSync = () => {
       if (socket.readyState === socket.OPEN) {
-        socket.send(JSON.stringify({ type: 'status', agentId, status }))
+        socket.send(JSON.stringify({ type: 'sync' }))
       }
     }
-    const onExit = (agentId: string, exitCode: number) => {
-      if (socket.readyState === socket.OPEN) {
-        socket.send(JSON.stringify({ type: 'exit', agentId, exitCode }))
-      }
-    }
-    const onSpawn = (agent: unknown) => {
-      if (socket.readyState === socket.OPEN) {
-        socket.send(JSON.stringify({ type: 'spawn', agent }))
-      }
-    }
-    const onRemove = (agentId: string) => {
-      if (socket.readyState === socket.OPEN) {
-        socket.send(JSON.stringify({ type: 'remove', agentId }))
-      }
-    }
-    const onSummary = (agentId: string, summary: string) => {
-      if (socket.readyState === socket.OPEN) {
-        socket.send(JSON.stringify({ type: 'summary', agentId, summary }))
-      }
-    }
-    ptyManager.on('status', onStatus)
-    ptyManager.on('exit', onExit)
-    ptyManager.on('spawn', onSpawn)
-    ptyManager.on('remove', onRemove)
-    ptyManager.on('summary', onSummary)
+    herdrSession.on('sync', onSync)
     socket.on('close', () => {
-      ptyManager.off('status', onStatus)
-      ptyManager.off('exit', onExit)
-      ptyManager.off('spawn', onSpawn)
-      ptyManager.off('remove', onRemove)
-      ptyManager.off('summary', onSummary)
+      herdrSession.off('sync', onSync)
     })
-  })
-
-  app.get<{
-    Params: { agentId: string }
-  }>('/ws/agents/:agentId', { websocket: true }, async (socket, req) => {
-    const found = await getAgent(req.params.agentId)
-    if (!found) {
-      socket.close(4404, 'agent not found')
-      return
-    }
-
-    if (found.agent.source === 'task') {
-      socket.close(4403, 'task child has no pty')
-      return
-    }
-
-    let session = ptyManager.getSession(req.params.agentId)
-    if (!session) {
-      try {
-        session = ptyManager.spawn({
-          agentId: found.agent.id,
-          workspaceId: found.workspace.id,
-          workspacePath: found.workspace.path,
-          cli: found.agent.cli,
-        })
-      } catch (err) {
-        socket.send(
-          `\r\n\x1b[31mFailed to spawn agent: ${
-            err instanceof Error ? err.message : String(err)
-          }\x1b[0m\r\n`,
-        )
-        socket.close(1011, 'spawn failed')
-        return
-      }
-    }
-
-    const ok = ptyManager.attach(req.params.agentId, socket)
-    if (!ok) {
-      socket.close(1011, 'attach failed')
-    }
   })
 
   await app.listen({ host: HOST, port: PORT })

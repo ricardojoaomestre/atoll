@@ -1,8 +1,13 @@
 import { homedir } from 'node:os'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { parseCliId } from './cli/index.js'
 import type { AgentRecord, AppSettings, AppState, CliId, SkyChoice, WorkspaceRecord } from './types.js'
+
+const AGENT_KIND = /^[a-z][a-z0-9_-]{0,31}$/
+
+export function parseAgentKind(value: unknown) {
+  return typeof value === 'string' && AGENT_KIND.test(value) ? value : 'cursor'
+}
 
 const STATE_PATH = join(homedir(), '.atoll', 'state.json')
 const LEGACY_STATE_PATH = join(homedir(), '.cursor-isles', 'state.json')
@@ -123,7 +128,7 @@ export function parseSkyChoice(value: unknown): SkyChoice {
 
 function readSettings(settings: AppSettings | undefined): AppSettings {
   return {
-    cli: parseCliId(settings?.cli),
+    cli: parseAgentKind(settings?.cli),
     sky: parseSkyChoice(settings?.sky),
   }
 }
@@ -146,8 +151,8 @@ export async function updateSettings(patch: Partial<AppSettings>) {
   return getSettings()
 }
 
-export async function setCli(cli: CliId) {
-  return updateSettings({ cli })
+export async function setCli(cli: string) {
+  return updateSettings({ cli: parseAgentKind(cli) })
 }
 
 export async function listWorkspaces() {
@@ -212,7 +217,7 @@ export async function addAgent(
     color: input.color ?? Math.floor(Math.random() * 360),
     parentId: input.parentId,
     source: input.source ?? 'pty',
-    cli: input.cli ?? getSettings().cli,
+    cli: input.cli ?? (getSettings().cli === 'claude' ? 'claude' : 'cursor'),
     taskKey: input.taskKey,
     status: 'working',
     x: 10 + Math.random() * 75,

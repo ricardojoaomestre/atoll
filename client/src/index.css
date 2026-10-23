@@ -1,5 +1,4 @@
 @import 'tailwindcss';
-@import '@xterm/xterm/css/xterm.css';
 
 @theme {
   --font-display: 'Press Start 2P', monospace;
@@ -266,6 +265,11 @@
   50% { transform: translate(5px); }
 }
 
+@keyframes pace {
+  0%, 100% { transform: translateX(-12px); }
+  50% { transform: translateX(16px); }
+}
+
 @keyframes sway {
   0%, 100% { transform: rotate(-3deg); }
   50% { transform: rotate(3deg); }
@@ -353,6 +357,7 @@
 .animate-typing { animation: typing 0.35s ease-in-out infinite; }
 .animate-wave { animation: wave 0.6s ease-in-out infinite; }
 .animate-drift { animation: drift 2.6s ease-in-out infinite; }
+.animate-pace { animation: pace 2.6s ease-in-out infinite; }
 .animate-sway { animation: sway 3.2s ease-in-out infinite; }
 .animate-flicker { animation: flicker 0.7s steps(2, end) infinite; }
 .animate-compass-needle { animation: compass-needle 2.6s ease-in-out infinite; }
@@ -394,6 +399,7 @@
   .animate-beg,
   .animate-beg-hands,
   .animate-drift,
+  .animate-pace,
   .animate-sway,
   .animate-flicker,
   .animate-compass-needle,
@@ -406,23 +412,3 @@
   }
 }
 
-.xterm {
-  height: 100%;
-  padding: 4px;
-  content-visibility: auto;
-}
-
-[data-agent-terminal] .xterm,
-[data-agent-terminal] .xterm-screen,
-[data-agent-terminal] .xterm-helper-textarea {
-  cursor: text;
-}
-
-[data-agent-terminal][hidden] {
-  display: none;
-  content-visibility: hidden;
-}
-
-.xterm-viewport {
-  overflow-y: auto !important;
-}

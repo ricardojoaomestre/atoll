@@ -7,6 +7,7 @@ const STATUS_JOB: Record<AgentStatus, string> = {
   done: 'The last job is finished.',
   'needs-question': 'Wondering about a question.',
   'needs-permission': 'Waiting for permission.',
+  unknown: 'Herdr is still recognizing this robot.',
 }
 
 export function jobLine(

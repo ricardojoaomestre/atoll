@@ -7,9 +7,9 @@
 <h1 align="center">Atoll</h1>
 
 <p align="center">
-  A pixel sea for the agents already on your machine.<br>
-  Folders become islands. Sessions become robots.<br>
-  The panel beside them is the real CLI.
+  A pixel sea for the agents Herdr is already running.<br>
+  Herdr workspaces become islands. Agent panes become robots.<br>
+  The terminal stays in Herdr. The island shows who is working.
 </p>
 
 <p align="center">
@@ -35,7 +35,7 @@ That installs dependencies, starts Atoll, and opens it in your browser. The API 
 | UI | http://127.0.0.1:5173 |
 | API | http://127.0.0.1:8787 |
 
-You need **Node 20+**, and a CLI you have already logged into: Cursor (`agent`) or Claude (`claude`). Pick the default under **SETTINGS**.
+You need **Node 20+** and Herdr running on this machine (`herdr`). Pick the kind of agent to spawn under **SETTINGS**. Herdr starts that CLI.
 
 <details>
 <summary>The same steps without Make</summary>
@@ -53,42 +53,39 @@ Then open http://127.0.0.1:5173.
 
 | | |
 | --- | --- |
-| **Islands** | A workspace is a folder on disk. The map is every folder you have docked. |
-| **Robots** | Each sprite is a live session. Spawn one, or a smaller one beside it. |
-| **Terminal** | xterm, wired to that session. Questions, permissions, and color stay in the CLI. Hide the panel and the session keeps running. |
+| **Islands** | A Herdr workspace. The path under it is the folder those panes are in. |
+| **Docks** | A Herdr tab. Shown when an island has more than one. |
+| **Robots** | A pane where Herdr sees an agent. The kind can be Cursor, Claude, Codex, or any other Herdr knows. |
+| **Terminal** | Stays in Herdr. Clicking a robot focuses that pane. |
 
 ## A short voyage
 
-1. **+ NEW WORKSPACE** — name the island and point it at a folder. `~/…` is fine.
-2. Open the island and press **+ SPAWN AGENT**. It starts the CLI you chose in Settings.
-3. Click a robot. The terminal fills the right of the screen. **HIDE**, Esc, or a click on the sprite returns you to the beach.
-4. **+ SUB-AGENT** starts another session. **DISMISS** ends one.
+1. **+ NEW WORKSPACE** — name the island and point it at a folder. Herdr opens that workspace. `~/…` is fine.
+2. Open the island and press **+ SPAWN AGENT**. Herdr starts the kind you chose in Settings.
+3. Click a robot. Herdr focuses that pane, and the island zooms to a card with its job. **HIDE** or Esc returns you to the beach. The session keeps running.
+4. Hover a sleeping robot and hand it a note, or answer one standing in the surf. **N** jumps to the next one waiting on you.
+5. **+ ANOTHER** starts a neighbor on the same island. **DISMISS** closes that pane.
 
-When an agent is waiting on you, the map shows **? N WONDERING**. You answer in the terminal.
+When an agent is blocked, the map shows **? N WONDERING**. That badge opens the reply. The ship's log under the chart is what the crew did after you opened Atoll.
 
 ## How a robot stands
 
 | | Status | Meaning |
 | --- | --- | --- |
-| ⚙ | `working` | The agent is printing |
-| ··· | `listening` | You are typing |
-| ? | `needs-question` | It asked something, then went quiet |
-| OK? | `needs-permission` | It is waiting for an allow / deny |
-| ✓ | `done` | The work went quiet, or the process exited |
-| z | `idle` | Asleep after a longer silence |
+| ⚙ | `working` | Herdr says the agent is working |
+| ? | `needs-question` | Herdr says `blocked` |
+| ✓ | `done` | Herdr says `done` (idle, and you have not looked yet) |
+| z | `idle` | Herdr says `idle` |
 
-Statuses come from terminal activity.
+Statuses come from Herdr.
 
 ## Under the hull
 
-Islands are remembered in `~/.atoll/state.json`. If `~/.cursor-isles/state.json` is still around, it is copied across on the first launch.
+The sky setting is remembered in `~/.atoll/state.json`. Islands and robots come from the live Herdr session, so they survive an Atoll restart.
 
 | Variable | What it changes |
 | --- | --- |
 | `PORT` | API port. Default `8787`. |
-| `CURSOR_AGENT_BIN` | Path to the Cursor `agent` binary |
-| `CLAUDE_BIN` | Path to `claude` |
-
-Sessions run through `node-pty-prebuilt-multiarch`.
+| `HERDR_SOCKET_PATH` | Herdr API socket. Default `~/.config/herdr/herdr.sock`. |
 
 Behavior, layout, and the rules for changing this repo live in [docs/](docs/). Coding agents should start at [AGENTS.md](AGENTS.md).

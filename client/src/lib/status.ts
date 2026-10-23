@@ -7,6 +7,7 @@ export const STATUS_LABEL: Record<AgentStatus, string> = {
   done: 'TASK DONE',
   'needs-question': 'WONDERING',
   'needs-permission': 'MAY I?',
+  unknown: 'SETTLING',
 }
 
 export const STATUS_CLASS: Record<AgentStatus, string> = {
@@ -16,6 +17,7 @@ export const STATUS_CLASS: Record<AgentStatus, string> = {
   done: 'bg-success text-primary-foreground',
   'needs-question': 'bg-warning text-primary-foreground',
   'needs-permission': 'bg-warning text-primary-foreground',
+  unknown: 'bg-muted text-muted-foreground',
 }
 
 export function countByStatus(

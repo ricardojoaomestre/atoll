@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Atoll gives a visual “map → island → agent” UI for **local** agent CLI sessions (Cursor and Claude). The terminal content is the real CLI over a PTY; the pixel sprites and badges are a thin layer on top.
+Atoll gives a visual “map → island → agent” UI for the Herdr session already running on this machine. Herdr owns every pane, every CLI, and the status of each agent. The sprites are a thin layer on that snapshot.
 
 ## User flows
 
@@ -10,53 +10,53 @@ Atoll gives a visual “map → island → agent” UI for **local** agent CLI s
 
 - Lists persisted **workspaces** as islands (name + path).
 - **+ NEW WORKSPACE**: name + filesystem path (`~` expanded server-side).
-- Badge **? N WONDERING** when any agent needs a question or permission (`needs-question` or `needs-permission`).
-- Delete workspace (X on card) kills PTYs and removes from state.
+- Islands drift by urgency. Wondering islands sit in front, larger. Unseen `done` carries a **✓ N DONE** flag. Sleeping islands sit smaller, toward the horizon.
+- Badge **? N WONDERING** is a link to that robot’s reply. **N** or **N · NEXT WAVE** does the same for the first one on the chart.
+- **SHIP'S LOG** at the bottom records pose changes after Atoll has seen a snapshot. Click a line to open that robot. The first snapshot stays blank.
+- Delete workspace (X on card) closes the Herdr workspace.
 
 ### Workspace (`/workspace/:id`)
 
-- **Overview mode**: all agents on a floating island; **+ SPAWN AGENT** starts a new PTY.
-- Hover or keyboard-focus a worker to read its current job in a dialogue at the bottom of the page. The box hides in focused mode.
-- **+ SUB-AGENT** (terminal footer) starts a **real sibling PTY** (`source: 'pty'`).
-- In-process CLI **Task** children appear as inferred sprites (`source: 'task'`, no PTY). Click opens the **parent** terminal and highlights the child.
-- **Focused mode** (agent selected): zoom transition — ~28% large sprite, ~72% terminal; full width, minimal side padding.
-- **Hide terminal**: HIDE button, **Esc**, or click the focused agent sprite → zoom back to island view; **PTY and xterm stay alive** (`openTerminalIds` keeps sessions).
-- **DISMISS**: kills PTY, removes agent record, closes session.
+- **Overview mode**: agents on a beach, grouped into docks when the Herdr workspace has more than one tab. Sleepers stand inland, workers pace with a crate, blocked robots stand in the surf, and a finished robot holds the check up on the grass. **+ SPAWN AGENT** starts the default kind in a free shell pane, or splits one first.
+- Hover or keyboard-focus a worker to read its current job in a dialogue at the bottom of the page. The line is Herdr’s summary token, title, or stripped terminal title. A sleeping or finished robot keeps a note box (`agent.prompt`). A wondering robot keeps a reply box (`pane.send_text`, then Enter). The box hides in focused mode. **N** cycles wondering robots on this island.
+- **+ ANOTHER** starts another agent of the default kind on the same island.
+- **Focused mode** (agent selected): zoom transition — large sprite beside a session card. Opening the card calls `agent.focus`, so the real terminal is the Herdr pane.
+- **HIDE**, **Esc**, or a click on the focused sprite zooms back. The Herdr pane keeps running.
+- **DISMISS**: closes that Herdr pane.
 
-### Terminal
+### Session card
 
-- xterm.js with system monospace font — **do not** restyle agent output as pixel/VT323 log lines.
-- WebSocket: `ws://127.0.0.1:8787/ws/agents/:agentId` in dev (see `client/src/lib/api.ts` `wsUrl`).
-- Server replays buffered PTY output on attach.
-- Hidden terminals stay mounted (`openTerminalIds`) but skip paint (`hidden` + `inert`); xterm scrollback is capped (~400 lines). Live PTY output is still written, batched on animation frames.
+The focused card shows the kind, folder, dock, and job line, plus the same note or reply box. It does not embed the CLI. Herdr’s public socket reads panes as snapshots, and a snapshot is not a TUI.
 
 ### Live status
 
-- Map and workspace badges update from `/api/events`, not a 4s poll.
-- REST refresh runs on mount, after mutations, and after events-socket reconnect.
+- Map and workspace badges update from `/api/events`. Herdr lifecycle and `pane.agent_status_changed` events invalidate the snapshot, and the server sends `{ "type": "sync" }`.
+- REST refresh runs on mount, after mutations, on `sync`, and after the events socket reconnects.
 
 ## Agent status (UI only)
 
-Statuses are **heuristics** from PTY activity, not parsed from Cursor SDK/stream-json:
+Statuses come from Herdr. `server/src/herdr/project.ts` maps them:
 
-| Status | Meaning |
-| --- | --- |
-| `working` | Agent is printing |
-| `listening` | You are typing a prompt (keystrokes, no new agent output) |
-| `needs-question` | Quiet ~1.5s after a conversational question (not a permission) |
-| `needs-permission` | Quiet ~1.5s after an allow/deny or y/n approval prompt |
-| `done` | Inferred task complete: was working, now quiet, no question/permission. Process exit also maps here. |
-| `idle` | Sleep: quiet ~20s after `done` or `listening`. Also used after server restart. |
+| Herdr | Atoll | Sprite |
+| --- | --- | --- |
+| `working` | `working` | Gear |
+| `idle` | `idle` | Sleep |
+| `blocked` | `needs-question` | Wondering `?` |
+| `done` | `done` | Check, until Herdr marks the pane seen and reports `idle` |
+| `unknown` | `unknown` | Plain robot, label SETTLING |
 
-Detection lives in `server/src/permission-detect.ts` and `server/src/pty-manager.ts`.
+`blocked` covers a question and a permission. The dialogue shows Herdr’s message. The pose stays wondering.
 
-## Task children (heuristic)
+`listening` and `needs-permission` remain in the sprite code. Herdr does not emit them.
 
-When the parent TUI mentions Task / sub-agent work, the server scans the last ~6–8k of replay (debounced ~400ms, only if the chunk looks relevant) and adds up to 8 inferred children. Status is `working` or `done` from that text; if the parent goes `idle` / `done` / exits, leftover working children become `done`. This is **not** ACP and **not** a child PTY.
+## What is a robot
+
+A robot is a Herdr pane whose `agent` field is set. A shell pane is empty sand. In-TUI Task children that never get their own pane stay inside that robot.
 
 ## Out of scope (by design)
 
+- Owning a second PTY beside Herdr
+- Painting `pane.read` snapshots into xterm
 - Cloud agents / `@cursor/sdk`
-- Parsing `agent -p --output-format stream-json` into a custom chat UI
 - Multi-user or binding API to `0.0.0.0`
-- `agent persist attach` (possible follow-up)
+- Named Herdr sessions other than the default socket (`HERDR_SOCKET_PATH` overrides it)

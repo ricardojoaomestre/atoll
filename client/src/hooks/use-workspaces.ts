@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { listWorkspaces } from '../lib/api'
+import { listLog, listWorkspaces } from '../lib/api'
 import { subscribeAgentEvents } from '../lib/events'
+import type { ShipLogEntry } from '../lib/ship-log'
 import type { Workspace } from '../types'
 
 export function useWorkspaces() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
+  const [log, setLog] = useState<ShipLogEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -15,6 +17,11 @@ export function useWorkspaces() {
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
+    }
+    try {
+      setLog(await listLog())
+    } catch {
+      /* the log is a memory; a missed fetch can wait for the next sync */
     } finally {
       setLoading(false)
     }
@@ -30,6 +37,10 @@ export function useWorkspaces() {
         void refresh()
       },
       onEvent: (msg) => {
+        if (msg.type === 'sync') {
+          void refresh()
+          return
+        }
         if (msg.type === 'spawn' && msg.agent) {
           const spawned = msg.agent
           setWorkspaces((prev) =>
@@ -87,5 +98,5 @@ export function useWorkspaces() {
     })
   }, [refresh])
 
-  return { workspaces, setWorkspaces, loading, error, refresh }
+  return { workspaces, setWorkspaces, log, loading, error, refresh }
 }

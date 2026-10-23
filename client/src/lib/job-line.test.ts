@@ -10,6 +10,7 @@ const fallbacks: [AgentStatus, string][] = [
   ['done', 'The last job is finished.'],
   ['needs-question', 'Wondering about a question.'],
   ['needs-permission', 'Waiting for permission.'],
+  ['unknown', 'Herdr is still recognizing this robot.'],
 ]
 
 describe('jobLine', () => {

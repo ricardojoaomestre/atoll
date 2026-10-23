@@ -5,6 +5,9 @@ interface AgentSpriteProps {
   small?: boolean
   selected?: boolean
   ghost?: boolean
+  pace?: boolean
+  paceDelay?: string
+  crate?: string
   onClick?: () => void
   onMouseEnter?: () => void
   onMouseLeave?: () => void
@@ -17,6 +20,9 @@ export function AgentSprite({
   small,
   selected,
   ghost,
+  pace,
+  paceDelay,
+  crate,
   onClick,
   onMouseEnter,
   onMouseLeave,
@@ -50,11 +56,23 @@ export function AgentSprite({
       className={`relative flex flex-col items-center focus:outline-none ${
         ghost ? 'cursor-default opacity-75' : 'group'
       }`}
-      style={{
-        transform: `scale(${small ? 0.7 : 1})`,
-        transformOrigin: 'bottom',
-      }}
     >
+      <div
+        className="relative flex flex-col items-center"
+        style={{
+          transform: `scale(${small ? 0.7 : 1})`,
+          transformOrigin: 'bottom',
+        }}
+      >
+      <div
+        className={`relative flex flex-col items-center ${pace ? 'animate-pace' : ''}`}
+        style={{ animationDelay: paceDelay }}
+      >
+      {crate && (
+        <div className="absolute top-0 left-full z-10 ml-2 hidden w-20 pixel-box bg-card px-1 py-0.5 font-mono text-lg leading-none text-card-foreground sm:block">
+          <span className="block truncate">{crate}</span>
+        </div>
+      )}
       <div className="absolute -top-12 flex h-10 items-end justify-center">
         {asking && (
           <div className="pixel-box animate-question-float bg-warning px-2 py-1 font-display text-xs text-primary-foreground">
@@ -275,6 +293,8 @@ export function AgentSprite({
         }`}
       >
         {agent.name}
+      </div>
+      </div>
       </div>
     </Tag>
   )

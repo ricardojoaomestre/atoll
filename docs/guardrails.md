@@ -2,14 +2,16 @@
 
 These rules exist because past bugs or product decisions were explicit. Future agents should treat them as hard constraints unless the user requests a deliberate change.
 
-## Terminal and CLI
+## Herdr
 
-- **Do not** replace the xterm panel with a fake log UI that parses agent output for display. Approvals, colors, and TUI widgets must stay native in xterm.
-- **Do not** use `agent -p` / `stream-json` for the main interactive session unless the product scope changes entirely.
-- **Do not** destroy the xterm WebSocket or PTY when the user **hides** the terminal. Only **DISMISS**, workspace delete, or process exit should kill sessions.
-- **Do not** unmount `AgentTerminal` on hide — use `visible` + keep `openTerminalIds` so replay and live PTY stay connected.
-- **Do not** spawn a PTY or attach xterm for `source === 'task'` inferred children. Click opens the parent terminal.
-- **Do not** scan the full replay or run heavy Task regex on every PTY chunk. Cheap hint first; debounce; last ~8k only.
+- Session state comes from the Herdr socket (`server/src/herdr/`). Do not spawn a parallel PTY for an agent Herdr already hosts.
+- **Do not** paint `pane.read` snapshots into xterm. That is a log. The TUI stays in the Herdr client.
+- Clicking a robot focuses the Herdr pane. Hiding the card does not close the pane. **DISMISS** closes the pane. Deleting an island closes the Herdr workspace.
+- Map `blocked` to wondering. Do not guess a permission pose from `blocked` alone.
+- A note is `agent.prompt`, and only for idle or done. A reply to a blocked robot is `pane.send_text` plus Enter. `agent.prompt` while blocked is refused by Herdr.
+- The ship's log is a memory of transitions. The snapshot remains the status. Do not persist the log in `state.json`.
+- Herdr `done` means idle and not yet seen. When Herdr reports `idle`, the robot sleeps.
+- On `events_lost`, refresh from `session.snapshot`. Do not merge a partial event stream back onto a stale cache.
 
 ## HTTP / API client
 
@@ -27,11 +29,9 @@ These rules exist because past bugs or product decisions were explicit. Future a
 
 ## Status semantics
 
-- **Do not** mark permission waits as `done` / green check. Use `needs-permission` + beg pose when `classifyPrompt` returns permission.
-- **Do not** mark a clarifying question as permission or `done`. Use `needs-question` + wondering `?`.
-- **Do not** mark idle-at-prompt as `working`. After work with no prompt, use `done`, then `idle` (sleep) after a longer silence.
-- **Do not** treat typing as `working`. Keystrokes are `listening`.
-- **Do not** reset status to fake `idle` on sprite click in the client; server/PTY owns status (removed behavior — keep it that way).
+- **Do not** mark Herdr `blocked` as `done` or as `needs-permission`.
+- **Do not** mark Herdr `idle` as `working`.
+- **Do not** reset status to a fake `idle` on sprite click. Herdr owns status.
 
 ## UI / UX
 
@@ -52,5 +52,5 @@ These rules exist because past bugs or product decisions were explicit. Future a
 
 ## When extending
 
-- New agent statuses: update **both** `client/src/types.ts` and `server/src/types.ts`, plus `status.ts`, sprites, and pty-manager logic.
+- New agent statuses: update **both** `client/src/types.ts` and `server/src/types.ts`, plus `status.ts`, sprites, and `server/src/herdr/project.ts`.
 - New API routes: update `client/src/lib/api.ts` and this doc set if behavior is non-obvious.

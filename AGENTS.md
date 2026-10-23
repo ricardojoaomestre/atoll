@@ -4,11 +4,12 @@ Read this before changing the repo. Human-oriented setup stays in [README.md](RE
 
 ## What this project is
 
-**Atoll** is a local-only web UI that maps agent CLI sessions (Cursor `agent`, Claude `claude`) onto a pixel-art “island” metaphor:
+**Atoll** is a local-only web UI that maps a Herdr session onto a pixel-art “island” metaphor. Herdr owns the terminals and the agent status. Atoll draws them.
 
-- **Workspaces** = folders on disk (`agent --workspace <path>`)
-- **Agents** = interactive PTY sessions running the real `agent` TUI
-- **Terminal panel** = xterm.js showing raw CLI output (not a reimplemented chat UI)
+- **Workspaces** = Herdr workspaces. The folder under an island is the pane cwd, or the worktree checkout.
+- **Agents** = Herdr agent panes. The kind (Cursor, Claude, Codex, …) comes from Herdr.
+- **Docks** = Herdr tabs, shown when a workspace has more than one.
+- **Focus** = `agent.focus`. The terminal stays in Herdr.
 
 Inspired by [Agent Isles](https://agent-arcade-workspaces.lovable.app); behavior is real CLI, not mock data.
 
@@ -21,6 +22,7 @@ Inspired by [Agent Isles](https://agent-arcade-workspaces.lovable.app); behavior
 | [docs/architecture.md](docs/architecture.md) | API, WebSockets, PTY lifecycle, persistence |
 | [docs/development.md](docs/development.md) | Install, dev servers, build, env vars |
 | [docs/guardrails.md](docs/guardrails.md) | **Do not** break these — common pitfalls |
+| [docs/herdr.md](docs/herdr.md) | How the island UI sits on a Herdr session |
 
 ## Quick run
 

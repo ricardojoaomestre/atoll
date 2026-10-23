@@ -5,10 +5,11 @@ export type AgentStatus =
   | 'needs-question'
   | 'needs-permission'
   | 'done'
+  | 'unknown'
 
 export type AgentSource = 'pty' | 'task'
 
-export type CliId = 'cursor' | 'claude'
+export type CliId = string
 
 export interface Agent {
   id: string
@@ -21,8 +22,17 @@ export interface Agent {
   taskKey?: string
   status: AgentStatus
   summary?: string
+  kind?: string
+  cwd?: string
+  tabId?: string
+  tabLabel?: string
   x: number
   createdAt: string
+}
+
+export interface WorkspaceTab {
+  id: string
+  label: string
 }
 
 export interface Workspace {
@@ -31,6 +41,7 @@ export interface Workspace {
   path: string
   hue: number
   agents: Agent[]
+  tabs?: WorkspaceTab[]
   createdAt: string
   firstCommitAt: string | null
   hasCamp: boolean

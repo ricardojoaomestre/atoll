@@ -28,6 +28,9 @@ describe('WorkspaceCard', () => {
         ],
       }),
     )
-    expect(screen.getByText('? 2 WONDERING')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '? 2 WONDERING' })).toHaveAttribute(
+      'href',
+      '/workspace/ws-1?mate=agent-1',
+    )
   })
 })

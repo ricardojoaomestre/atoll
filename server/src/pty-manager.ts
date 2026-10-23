@@ -93,7 +93,8 @@ class PtyManager extends EventEmitter {
       return this.sessions.get(input.agentId)!
     }
 
-    const cli = getCli(input.cli ?? getSettings().cli)
+    const selected = input.cli ?? (getSettings().cli === 'claude' ? 'claude' : 'cursor')
+    const cli = getCli(selected)
     const bin = cli.resolveBin()
     if (!bin) {
       throw new Error(

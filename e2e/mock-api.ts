@@ -74,6 +74,14 @@ export async function mockAppApi(
       })
     }
 
+    if (pathname === '/api/log' && method === 'GET') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      })
+    }
+
     if (pathname === '/api/workspaces' && method === 'GET') {
       return route.fulfill({
         status: 200,

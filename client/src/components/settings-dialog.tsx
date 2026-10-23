@@ -73,13 +73,13 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
         <h2 id="settings-title" className="font-display text-sm text-primary">
           SETTINGS
         </h2>
-        <p className="mt-4 font-display text-[8px] text-primary">DEFAULT CLI</p>
+        <p className="mt-4 font-display text-[8px] text-primary">DEFAULT KIND</p>
         <p className="mt-2 font-mono text-xl text-muted-foreground">
-          New agents start with this CLI. One already running keeps the CLI it
-          started with.
+          New robots start as this Herdr agent. One already on an island keeps
+          the kind Herdr detected.
         </p>
 
-        <div className="mt-5 flex flex-col gap-3" role="radiogroup" aria-label="Default CLI">
+        <div className="mt-5 flex flex-col gap-3" role="radiogroup" aria-label="Default agent kind">
           {options.map((option) => {
             const selected = cli === option.id
             return (

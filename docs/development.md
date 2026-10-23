@@ -11,8 +11,8 @@ Installs dependencies, starts the UI and the API, and opens http://127.0.0.1:517
 ## Prerequisites
 
 - Node 20+
-- Cursor CLI on PATH (typically `~/.local/bin/agent`)
-- `agent login` completed once on the machine
+- Herdr running on this machine (`herdr`, socket `~/.config/herdr/herdr.sock`)
+- The agent CLIs you want to spawn, already logged in. Herdr starts them.
 
 ## Install
 
